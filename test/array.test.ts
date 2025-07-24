@@ -9,9 +9,9 @@ const ItemsSchema = z.object({
 }).array()
 
 describe('z.array()', () => {
-	const { node } = zodToTs(ItemsSchema, 'User')
-
 	it('outputs correct typescript', () => {
+		const { node } = zodToTs(ItemsSchema, 'User')
+
 		expect(printNodeTest(node)).toMatchInlineSnapshot(`
 			"{
 			    id: number;

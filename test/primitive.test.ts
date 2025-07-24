@@ -17,9 +17,9 @@ const PrimitiveSchema = z.object({
 })
 
 describe('PrimitiveSchema', () => {
-	const { node } = zodToTs(PrimitiveSchema, 'User')
-
 	it('outputs correct typescript', () => {
+		const { node } = zodToTs(PrimitiveSchema, 'User')
+
 		expect(printNodeTest(node)).toMatchInlineSnapshot(`
 			"{
 			    username: string;

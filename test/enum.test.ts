@@ -12,7 +12,7 @@ describe('Color enum', () => {
 
 	it('uses identifier provided using `withGetType`', () => {
 		const schema = withGetType(
-			z.nativeEnum(Color),
+			z.enum(Color),
 			(ts) => ts.factory.createIdentifier('Color'),
 		)
 
@@ -23,7 +23,7 @@ describe('Color enum', () => {
 
 	it('handles numeric literals with resolveNativeEnums', () => {
 		const schema = withGetType(
-			z.nativeEnum(Color),
+			z.enum(Color),
 			(ts) => ts.factory.createIdentifier('Color'),
 		)
 
@@ -51,7 +51,7 @@ describe('Fruit enum', () => {
 
 	it('handles string literals with resolveNativeEnums', () => {
 		const schema = withGetType(
-			z.nativeEnum(Fruit),
+			z.enum(Fruit),
 			(ts) => ts.factory.createIdentifier('Fruit'),
 		)
 
@@ -75,7 +75,7 @@ it('handles string literal properties', () => {
 	}
 
 	const schema = withGetType(
-		z.nativeEnum(StringLiteral),
+		z.enum(StringLiteral),
 		(ts) => ts.factory.createIdentifier('StringLiteral'),
 	)
 
@@ -100,7 +100,7 @@ describe('convertNativeEnumToUnion option', () => {
 			Green,
 			Blue,
 		}
-		const schema = z.nativeEnum(Color)
+		const schema = z.enum(Color)
 		const { node } = zodToTs(schema, undefined, { nativeEnums: 'union' })
 		expect(printNodeTest(node)).toMatchInlineSnapshot(`"\\"Red\\" | \\"Green\\" | \\"Blue\\" | 0 | 1 | 2"`)
 	})
@@ -111,7 +111,7 @@ describe('convertNativeEnumToUnion option', () => {
 			Banana = 'banana',
 			Cantaloupe = 'cantaloupe',
 		}
-		const schema = z.nativeEnum(Fruit)
+		const schema = z.enum(Fruit)
 		const { node } = zodToTs(schema, undefined, { nativeEnums: 'union' })
 		expect(printNodeTest(node)).toMatchInlineSnapshot(`"\\"apple\\" | \\"banana\\" | \\"cantaloupe\\""`)
 	})
