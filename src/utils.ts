@@ -1,6 +1,8 @@
 import ts from 'typescript';
-import type { ZodTypeAny } from 'zod';
-import type { GetType, GetTypeFunction } from './types.js';
+import type { $ZodType } from 'zod/v4/core';
+import { util } from 'zod/v4/core';
+import { zodToTs } from './index.js';
+import { GetType, GetTypeFunction, ZodToTsOptions } from './types.js';
 
 const { factory: f, SyntaxKind, ScriptKind, ScriptTarget, EmitHint } = ts;
 
@@ -55,7 +57,49 @@ export const printNode = (
   return printer.printNode(EmitHint.Unspecified, node, sourceFile);
 };
 
-export const withGetType = <T extends ZodTypeAny & GetType>(
+interface PrintZodToTsOptions extends ZodToTsOptions, ts.PrinterOptions {
+  /**
+   * A map of Schema Name -> Zod Schema.
+   *
+   * The schema name will be used as the identifier.
+   *
+   * If a single schema is provided, it can be provided as a single Zod schema instead of a record.
+   * In that case, it will not be assigned an identifier and will be printed as a type literal.
+   */
+  schemas: Record<string, $ZodType> | $ZodType;
+}
+
+export function convertZodToTs(
+  options: PrintZodToTsOptions,
+): readonly ts.TypeNode[] {
+  const { schemas, nativeEnums, ...printerOptions } = options;
+
+  const nodes: ts.TypeNode[] = [];
+
+  const zodToTsOptions: Required<ZodToTsOptions> = { nativeEnums };
+
+  if (util.isPlainObject(schemas)) {
+    for (const schemaIdentifier of Object.keys(schemas)) {
+      nodes.push(
+        zodToTs(schemas[schemaIdentifier], schemaIdentifier, zodToTsOptions)
+          .node,
+      );
+    }
+  } else {
+    // If a single schema is provided, we do not assign an identifier.
+    nodes.push(zodToTs(schemas, undefined, zodToTsOptions).node);
+  }
+
+  return nodes;
+}
+
+export function printZodAsTs(options: PrintZodToTsOptions): string {
+  return convertZodToTs(options)
+    .map((node) => printNode(node, options))
+    .join('\n\n');
+}
+
+export const withGetType = <T extends $ZodType & GetType>(
   schema: T,
   getType: GetTypeFunction,
 ): T => {

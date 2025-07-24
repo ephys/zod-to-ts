@@ -1,40 +1,25 @@
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
-import { zodToTs } from '../src/index.js';
-import { printNodeTest } from './utils.js';
-
-const PrimitiveSchema = z.object({
-  username: z.string(),
-  age: z.number(),
-  isAdmin: z.boolean(),
-  createdAt: z.date(),
-  undef: z.undefined(),
-  nu: z.null(),
-  vo: z.void(),
-  an: z.any(),
-  unknow: z.unknown(),
-  nev: z.never(),
-  bigint: z.bigint(),
-});
+import { printZodAsTs } from '../src/utils.js';
 
 describe('PrimitiveSchema', () => {
-  it('outputs correct typescript', () => {
-    const { node } = zodToTs(PrimitiveSchema, 'User');
-
-    expect(printNodeTest(node)).toMatchInlineSnapshot(`
-			"{
-			    username: string;
-			    age: number;
-			    isAdmin: boolean;
-			    createdAt: Date;
-			    undef?: undefined;
-			    nu: null;
-			    vo?: void | undefined;
-			    an?: any;
-			    unknow?: unknown;
-			    nev: never;
-			    bigint: bigint;
-			}"
-		`);
+  it.each([
+    [z.string(), 'string'],
+    [z.number(), 'number'],
+    [z.boolean(), 'boolean'],
+    [z.date(), 'Date'],
+    [z.undefined(), 'undefined'],
+    [z.null(), 'null'],
+    [z.void(), 'void | undefined'],
+    [z.any(), 'any'],
+    [z.unknown(), 'unknown'],
+    [z.never(), 'never'],
+    [z.bigint(), 'bigint'],
+  ])('supports $1', (schema, result) => {
+    expect(
+      printZodAsTs({
+        schemas: schema,
+      }),
+    ).toEqual(result);
   });
 });

@@ -20,12 +20,12 @@ describe('Color enum', () => {
     expect(printNodeTest(node)).toMatchInlineSnapshot('"Color"');
   });
 
-  it('handles numeric literals with resolveNativeEnums', () => {
+  it('handles numeric literals with nativeEnums: resolve', () => {
     const schema = withGetType(z.enum(Color), (ts) =>
       ts.factory.createIdentifier('Color'),
     );
 
-    const { store } = zodToTs(schema, undefined, { resolveNativeEnums: true });
+    const { store } = zodToTs(schema, undefined, { nativeEnums: 'resolve' });
 
     expect(printNodeTest(store.nativeEnums[0])).toMatchInlineSnapshot(`
 			"enum Color {
@@ -47,7 +47,7 @@ describe('Fruit enum', () => {
     Cantaloupe = 'cantaloupe',
   }
 
-  it('handles string literals with resolveNativeEnums', () => {
+  it('handles string literals with nativeEnums: resolve', () => {
     const schema = withGetType(z.enum(Fruit), (ts) =>
       ts.factory.createIdentifier('Fruit'),
     );

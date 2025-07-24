@@ -9,7 +9,9 @@
     "allowSyntheticDefaultImports": true,
     "forceConsistentCasingInFileNames": true,
     "noEmit": true,
-    "isolatedModules": true
+    "isolatedModules": true,
+    "strictNullChecks": true,
+    "exactOptionalPropertyTypes": true
   },
   "include": ["src", "test"],
   "exclude": ["node_modules", "dist"]
