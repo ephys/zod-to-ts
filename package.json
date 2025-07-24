@@ -1,76 +1,81 @@
 {
-	"name": "zod-to-ts",
-	"version": "1.2.0",
-	"type": "module",
-	"description": "generate TypeScript types from your Zod schema",
-	"repository": {
-		"type": "git",
-		"url": "https://github.com/sachinraja/zod-to-ts.git"
-	},
-	"homepage": "https://github.com/sachinraja/zod-to-ts#readme",
-	"bugs": {
-		"url": "https://github.com/sachinraja/zod-to-ts/issues"
-	},
-	"main": "dist/index.cjs",
-	"exports": {
-		"./package.json": "./package.json",
-		".": {
-			"import": "./dist/index.js",
-			"default": "./dist/index.cjs"
-		}
-	},
-	"types": "dist/index.d.ts",
-	"files": [
-		"dist"
-	],
-	"keywords": [
-		"zod",
-		"typescript",
-		"generator"
-	],
-	"scripts": {
-		"build": "tsup",
-		"watch": "tsup --watch --no-dts",
-		"format": "dprint fmt",
-		"lint": "run-p lint:*",
-		"lint:format": "dprint check",
-		"lint:types": "tsc",
-		"lint:js": "eslint .",
-		"prepublishOnly": "pnpm build",
-		"test": "vitest",
-		"example": "tsx test/example.ts"
-	},
-	"peerDependencies": {
-		"typescript": "^4.9.4 || ^5.0.2",
-		"zod": "^4"
-	},
-	"devDependencies": {
-		"@sachinraja/eslint-config": "0.3.0",
-		"@types/node": "20.5.0",
-		"dprint": "0.40.2",
-		"eslint": "8.47.0",
-		"npm-run-all": "4.1.5",
-		"tsup": "7.2.0",
-		"tsx": "3.12.7",
-		"typescript": "5.1.6",
-		"vite": "4.4.9",
-		"vitest": "0.34.1",
-		"zod": "4.0.8"
-	},
-	"sideEffects": false,
-	"tsup": {
-		"entry": [
-			"src/index.ts"
-		],
-		"format": [
-			"esm",
-			"cjs"
-		],
-		"dts": {
-			"resolve": true
-		},
-		"splitting": true,
-		"clean": true
-	},
-	"packageManager": "pnpm@8.15.9"
+  "name": "@ephys/zod-to-ts",
+  "version": "2.0.0",
+  "type": "module",
+  "description": "Generate TypeScript types from your Zod schema",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ephys/zod-to-ts.git"
+  },
+  "homepage": "https://github.com/ephys/zod-to-ts#readme",
+  "bugs": {
+    "url": "https://github.com/ephys/zod-to-ts/issues"
+  },
+  "main": "dist/index.js",
+  "exports": {
+    "./package.json": "./package.json",
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "keywords": [
+    "zod",
+    "typescript",
+    "generator"
+  ],
+  "scripts": {
+    "build": "tsc --project tsconfig.build.json",
+    "format": "eslint . --fix && prettier . --write",
+    "lint": "run-p lint:*",
+    "lint:format": "dprint check",
+    "lint:types": "tsc",
+    "lint:js": "eslint .",
+    "prepublishOnly": "pnpm build",
+    "test": "vitest",
+    "example": "tsx test/example.ts"
+  },
+  "peerDependencies": {
+    "typescript": "^4.9.4 || ^5.0.2",
+    "zod": "^4"
+  },
+  "devDependencies": {
+    "@ephys/eslint-config-typescript": "^20.1.4",
+    "@sachinraja/eslint-config": "0.3.0",
+    "@types/node": "24.1.0",
+    "dprint": "0.50.1",
+    "eslint": "^8.56.0",
+    "npm-run-all": "4.1.5",
+    "prettier": "^3.6.2",
+    "prettier-plugin-organize-imports": "^4.2.0",
+    "tsx": "4.20.3",
+    "typescript": "5.8.3",
+    "vite": "7.0.6",
+    "vitest": "3.2.4",
+    "zod": "4.0.8"
+  },
+  "sideEffects": false,
+  "tsup": {
+    "entry": [
+      "src/index.ts"
+    ],
+    "format": [
+      "esm",
+      "cjs"
+    ],
+    "dts": {
+      "resolve": true
+    },
+    "splitting": true,
+    "clean": true
+  },
+  "packageManager": "pnpm@10.13.1",
+  "prettier": {
+    "singleQuote": true,
+    "plugins": ["prettier-plugin-organize-imports"]
+  }
 }

@@ -1,26 +1,27 @@
-import { describe, expect, it } from 'vitest'
-import { z } from 'zod'
-import { zodToTs } from '../src'
-import { printNodeTest } from './utils'
+import { describe, expect, it } from 'vitest';
+import { z } from 'zod';
+import { zodToTs } from '../src/index.js';
+import { printNodeTest } from './utils.js';
 
 const PrimitiveSchema = z.object({
-	username: z.string(),
-	age: z.number(),
-	isAdmin: z.boolean(),
-	createdAt: z.date(),
-	undef: z.undefined(),
-	nu: z.null(),
-	vo: z.void(),
-	an: z.any(),
-	unknow: z.unknown(),
-	nev: z.never(),
-})
+  username: z.string(),
+  age: z.number(),
+  isAdmin: z.boolean(),
+  createdAt: z.date(),
+  undef: z.undefined(),
+  nu: z.null(),
+  vo: z.void(),
+  an: z.any(),
+  unknow: z.unknown(),
+  nev: z.never(),
+  bigint: z.bigint(),
+});
 
 describe('PrimitiveSchema', () => {
-	it('outputs correct typescript', () => {
-		const { node } = zodToTs(PrimitiveSchema, 'User')
+  it('outputs correct typescript', () => {
+    const { node } = zodToTs(PrimitiveSchema, 'User');
 
-		expect(printNodeTest(node)).toMatchInlineSnapshot(`
+    expect(printNodeTest(node)).toMatchInlineSnapshot(`
 			"{
 			    username: string;
 			    age: number;
@@ -32,7 +33,8 @@ describe('PrimitiveSchema', () => {
 			    an?: any;
 			    unknow?: unknown;
 			    nev: never;
+			    bigint: bigint;
 			}"
-		`)
-	})
-})
+		`);
+  });
+});

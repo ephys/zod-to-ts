@@ -1,30 +1,30 @@
-import { describe, expect, it } from 'vitest'
-import { z } from 'zod'
-import { zodToTs } from '../src'
-import { printNodeTest } from './utils'
+import { describe, expect, it } from 'vitest';
+import { z } from 'zod';
+import { zodToTs } from '../src/index.js';
+import { printNodeTest } from './utils.js';
 
 const ShapeSchema = z.discriminatedUnion('kind', [
-	z.object({ kind: z.literal('circle'), radius: z.number() }),
-	z.object({ kind: z.literal('square'), x: z.number() }),
-	z.object({ kind: z.literal('triangle'), x: z.number(), y: z.number() }),
-])
+  z.object({ kind: z.literal('circle'), radius: z.number() }),
+  z.object({ kind: z.literal('square'), x: z.number() }),
+  z.object({ kind: z.literal('triangle'), x: z.number(), y: z.number() }),
+]);
 
 describe('z.discriminatedUnion()', () => {
-	const { node } = zodToTs(ShapeSchema, 'Shape')
+  it('outputs correct typescript', () => {
+    const { node } = zodToTs(ShapeSchema, 'Shape');
 
-	it('outputs correct typescript', () => {
-		expect(printNodeTest(node)).toMatchInlineSnapshot(`
+    expect(printNodeTest(node)).toMatchInlineSnapshot(`
 			"{
-			    kind: \\"circle\\";
+			    kind: "circle";
 			    radius: number;
 			} | {
-			    kind: \\"square\\";
+			    kind: "square";
 			    x: number;
 			} | {
-			    kind: \\"triangle\\";
+			    kind: "triangle";
 			    x: number;
 			    y: number;
 			}"
-		`)
-	})
-})
+		`);
+  });
+});

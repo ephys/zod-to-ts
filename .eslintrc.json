@@ -1,11 +1,6 @@
 {
 	"root": true,
-	"extends": "@sachinraja",
-	"rules": {
-		"unicorn/prevent-abbreviations": ["error", {
-			"allowList": {
-				"addJsDocComment": true
-			}
-		}]
-	}
+	"extends": [
+		"@ephys/eslint-config-typescript"
+	]
 }

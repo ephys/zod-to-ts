@@ -1,36 +1,34 @@
-import ts from 'typescript'
-
-export type LiteralType = string | number | boolean
+import type ts from 'typescript';
 
 export type ZodToTsOptions = {
-	/** @deprecated use `nativeEnums` instead */
-	resolveNativeEnums?: boolean
-	nativeEnums?: 'identifier' | 'resolve' | 'union'
-}
+  /** @deprecated use `nativeEnums` instead */
+  resolveNativeEnums?: boolean;
+  nativeEnums?: 'identifier' | 'resolve' | 'union';
+};
 
 export const resolveOptions = (raw?: ZodToTsOptions) => {
-	const resolved = {
-		nativeEnums: raw?.resolveNativeEnums ? 'resolve' : 'identifier',
-	} satisfies ZodToTsOptions
+  const resolved = {
+    nativeEnums: raw?.resolveNativeEnums ? 'resolve' : 'identifier',
+  } satisfies ZodToTsOptions;
 
-	return { ...resolved, ...raw }
-}
+  return { ...resolved, ...raw };
+};
 
-export type ResolvedZodToTsOptions = ReturnType<typeof resolveOptions>
+export type ResolvedZodToTsOptions = ReturnType<typeof resolveOptions>;
 
 export type ZodToTsStore = {
-	nativeEnums: ts.EnumDeclaration[]
-}
+  nativeEnums: ts.EnumDeclaration[];
+};
 
 export type ZodToTsReturn = {
-	node: ts.TypeNode
-	store: ZodToTsStore
-}
+  node: ts.TypeNode;
+  store: ZodToTsStore;
+};
 
 export type GetTypeFunction = (
-	typescript: typeof ts,
-	identifier: string,
-	options: ResolvedZodToTsOptions,
-) => ts.Identifier | ts.TypeNode
+  typescript: typeof ts,
+  identifier: string,
+  options: ResolvedZodToTsOptions,
+) => ts.Identifier | ts.TypeNode;
 
-export type GetType = { _def: { getType?: GetTypeFunction } }
+export type GetType = { _def: { getType?: GetTypeFunction } };
