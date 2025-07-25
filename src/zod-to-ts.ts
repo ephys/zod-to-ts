@@ -30,7 +30,8 @@ import type {
   $ZodType,
   $ZodUnionDef,
 } from 'zod/v4/core';
-import { util } from 'zod/v4/core';
+import { globalRegistry, util } from 'zod/v4/core';
+import type { TsZodRegistry } from './utils.js';
 import {
   addJsDocComment,
   createTypeAlias,
@@ -63,15 +64,28 @@ export interface ZodToTsOptions {
         modifiers: SeenModifiers,
       ) => ts.TypeNode | undefined)
     | undefined;
+
+  /**
+   * The registry that contains metadata for Zod schemas.
+   * Defaults to the global registry.
+   */
+  registry?: TsZodRegistry | undefined;
 }
 
 export function zodToNode(schema: $ZodType, options?: ZodToTsOptions): ts.Node {
   const node: ts.TypeNode = zodToTypeNode(schema, options, [], EMPTY_OBJECT);
 
-  const identifier = getSchemaIdentifier(schema);
+  const identifier = getSchemaIdentifier(
+    schema,
+    options?.registry ?? globalRegistry,
+  );
 
   if (identifier) {
-    return createTypeAlias(node, identifier, getSchemaDescription(schema));
+    return createTypeAlias(
+      node,
+      identifier,
+      getSchemaDescription(schema, options?.registry ?? globalRegistry),
+    );
   }
 
   return node;
@@ -225,7 +239,10 @@ export function zodToTypeNode(
          */
         const description = options?.identifiers?.includes(nextZodNode)
           ? undefined
-          : getSchemaDescription(nextZodNode);
+          : getSchemaDescription(
+              nextZodNode,
+              options?.registry ?? globalRegistry,
+            );
 
         if (description) {
           addJsDocComment(propertySignature, description);
@@ -603,12 +620,19 @@ export function zodToTypeOrIdentifierNode(
   seenModifiers: SeenModifiers,
 ) {
   if (options?.identifiers) {
-    const id = getSchemaIdentifier(currentSchema);
+    const id = getSchemaIdentifier(
+      currentSchema,
+      options.registry ?? globalRegistry,
+    );
 
     if (
       id &&
       options.identifiers.some(
-        (identifier) => getSchemaIdentifier(identifier) === id,
+        (identifier) =>
+          getSchemaIdentifier(
+            identifier,
+            options.registry ?? globalRegistry,
+          ) === id,
       )
     ) {
       return createTypeReferenceFromString(id);

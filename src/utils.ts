@@ -1,10 +1,15 @@
 import ts from 'typescript';
-import type { $ZodType } from 'zod/v4/core';
+import type { $ZodRegistry, $ZodType, JSONSchemaMeta } from 'zod/v4/core';
 import { globalRegistry, safeParse } from 'zod/v4/core';
 import type { ZodToTsOptions } from './zod-to-ts.js';
 import { zodToNode } from './zod-to-ts.js';
 
 const { factory: f, SyntaxKind, ScriptKind, ScriptTarget, EmitHint } = ts;
+
+export interface TsSchemaMeta
+  extends Pick<JSONSchemaMeta, 'id' | 'description' | 'deprecated'> {}
+
+export type TsZodRegistry = $ZodRegistry<TsSchemaMeta>;
 
 export function createTypeReferenceFromString(identifier: string) {
   return f.createTypeReferenceNode(f.createIdentifier(identifier));
@@ -68,7 +73,7 @@ export interface ConvertZodToTsOptions
 export function convertZodToTs(
   options: ConvertZodToTsOptions,
 ): readonly ts.Node[] {
-  const { schemas, overwriteTsOutput } = options;
+  const { schemas, overwriteTsOutput, registry } = options;
 
   const nodes: ts.Node[] = [];
 
@@ -76,10 +81,14 @@ export function convertZodToTs(
     const zodToTsOptions: Required<ZodToTsOptions> = {
       identifiers: schemas,
       overwriteTsOutput,
+      registry,
     };
 
     for (const schema of schemas) {
-      if (schemas.length > 1 && !getSchemaIdentifier(schema)) {
+      if (
+        schemas.length > 1 &&
+        !getSchemaIdentifier(schema, options.registry ?? globalRegistry)
+      ) {
         throw new Error(
           'When multiple schemas are provided, each schema in the array must have a unique identifier set in its metadata using the `meta` method.',
         );
@@ -91,6 +100,7 @@ export function convertZodToTs(
     const zodToTsOptions: Required<ZodToTsOptions> = {
       identifiers: [schemas],
       overwriteTsOutput,
+      registry,
     };
 
     // If a single schema is provided, we do not assign an identifier.
@@ -106,12 +116,14 @@ export interface PrintZodAsTsOptions
 
 export function printZodAsTs({
   schemas,
+  registry,
   overwriteTsOutput,
   ...printerOptions
 }: PrintZodAsTsOptions): string {
   const convertZodToTsOptions: Required<ConvertZodToTsOptions> = {
-    schemas,
     overwriteTsOutput,
+    registry,
+    schemas,
   };
 
   return convertZodToTs(convertZodToTsOptions)
@@ -138,12 +150,18 @@ export function addJsDocComment(node: ts.Node, text: string) {
   );
 }
 
-export function getSchemaDescription(schema: $ZodType): string | undefined {
-  return globalRegistry.get(schema)?.description;
+export function getSchemaDescription(
+  schema: $ZodType,
+  registry: TsZodRegistry,
+): string | undefined {
+  return registry.get(schema)?.description;
 }
 
-export function getSchemaIdentifier(schema: $ZodType): string | undefined {
-  const id = globalRegistry.get(schema)?.id;
+export function getSchemaIdentifier(
+  schema: $ZodType,
+  registry: TsZodRegistry,
+): string | undefined {
+  const id = registry.get(schema)?.id;
 
   if (id) {
     return id;
@@ -151,7 +169,7 @@ export function getSchemaIdentifier(schema: $ZodType): string | undefined {
 
   const parent = schema._zod.parent;
   if (parent) {
-    return getSchemaIdentifier(parent);
+    return getSchemaIdentifier(parent, registry);
   }
 
   return undefined;
