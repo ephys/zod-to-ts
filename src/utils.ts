@@ -7,7 +7,7 @@ import { zodToNode } from './zod-to-ts.js';
 const { factory: f, SyntaxKind, ScriptKind, ScriptTarget, EmitHint } = ts;
 
 export interface TsSchemaMeta
-  extends Pick<JSONSchemaMeta, 'id' | 'description' | 'deprecated'> {}
+  extends Pick<JSONSchemaMeta, 'id' | 'description'> {}
 
 export type TsZodRegistry = $ZodRegistry<TsSchemaMeta>;
 

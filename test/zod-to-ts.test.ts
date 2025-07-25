@@ -13,4 +13,26 @@ describe('zod-to-ts', () => {
       printZodAsTs({ schemas: UserSchema });
     }).toThrowError(`Circular reference detected in Zod schema`);
   });
+
+  it('does not support comments on non-declaration outputs', () => {
+    const MyStringSchema = z.string().describe('A string');
+
+    const output = printZodAsTs({ schemas: MyStringSchema });
+
+    expect(output).toEqual(`string`);
+  });
+
+  it('supports comments on declaration outputs', () => {
+    const MyStringSchema = z
+      .string()
+      .describe('A string')
+      .meta({ id: 'MyString' });
+
+    const output = printZodAsTs({ schemas: MyStringSchema });
+
+    expect(output).toMatchInlineSnapshot(`
+    "/** A string */
+    type MyString = string;"
+    `);
+  });
 });
