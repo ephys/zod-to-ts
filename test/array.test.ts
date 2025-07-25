@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
-import { zodToTs } from '../src/index.js';
-import { printNodeTest } from './utils.js';
+import { printZodAsTs } from '../src/index.js';
 
 const ItemsSchema = z
   .object({
@@ -12,9 +11,7 @@ const ItemsSchema = z
 
 describe('z.array()', () => {
   it('outputs correct typescript', () => {
-    const { node } = zodToTs(ItemsSchema, 'User');
-
-    expect(printNodeTest(node)).toMatchInlineSnapshot(`
+    expect(printZodAsTs({ schemas: ItemsSchema })).toMatchInlineSnapshot(`
 			"{
 			    id: number;
 			    value: string;

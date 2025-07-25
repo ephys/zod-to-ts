@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import { printZodAsTs } from '../src/utils.js';
 
-describe('PrimitiveSchema', () => {
+describe('primitives', () => {
   it.each([
     [z.string(), 'string'],
     [z.number(), 'number'],

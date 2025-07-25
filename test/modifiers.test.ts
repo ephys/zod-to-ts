@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
-import { zodToTs } from '../src/index.js';
-import { printNodeTest } from './utils.js';
+import { printZodAsTs } from '../src/index.js';
 
 const OptionalStringSchema = z.string().optional();
 
@@ -27,14 +26,14 @@ const ObjectWithOptionals = z.object({
 
 describe('z.optional()', () => {
   it('outputs correct typescript', () => {
-    const { node } = zodToTs(OptionalStringSchema);
-    expect(printNodeTest(node)).toMatchInlineSnapshot('"string | undefined"');
+    expect(
+      printZodAsTs({ schemas: OptionalStringSchema }),
+    ).toMatchInlineSnapshot('"string | undefined"');
   });
 
   it('should output `?:` and undefined union for optional properties', () => {
-    const { node } = zodToTs(ObjectWithOptionals);
-
-    expect(printNodeTest(node)).toMatchInlineSnapshot(`
+    expect(printZodAsTs({ schemas: ObjectWithOptionals }))
+      .toMatchInlineSnapshot(`
 			"{
 			    optional?: string | undefined;
 			    required: string;
@@ -58,10 +57,9 @@ const NullableUsernameSchema = z.object({
 });
 
 describe('z.nullable()', () => {
-  const { node } = zodToTs(NullableUsernameSchema);
-
   it('outputs correct typescript', () => {
-    expect(printNodeTest(node)).toMatchInlineSnapshot(`
+    expect(printZodAsTs({ schemas: NullableUsernameSchema }))
+      .toMatchInlineSnapshot(`
 			"{
 			    username: string | null;
 			}"

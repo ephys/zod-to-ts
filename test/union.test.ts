@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
-import { zodToTs } from '../src/index.js';
-import { printNodeTest } from './utils.js';
+import { printZodAsTs } from '../src/index.js';
 
 const ShapeSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('circle'), radius: z.number() }),
@@ -11,9 +10,7 @@ const ShapeSchema = z.discriminatedUnion('kind', [
 
 describe('z.discriminatedUnion()', () => {
   it('outputs correct typescript', () => {
-    const { node } = zodToTs(ShapeSchema, 'Shape');
-
-    expect(printNodeTest(node)).toMatchInlineSnapshot(`
+    expect(printZodAsTs({ schemas: ShapeSchema })).toMatchInlineSnapshot(`
 			"{
 			    kind: "circle";
 			    radius: number;

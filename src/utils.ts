@@ -1,32 +1,34 @@
 import ts from 'typescript';
 import type { $ZodType } from 'zod/v4/core';
-import { util } from 'zod/v4/core';
+import { globalRegistry, safeParse } from 'zod/v4/core';
 import { zodToTs } from './index.js';
-import { GetType, GetTypeFunction, ZodToTsOptions } from './types.js';
+import { ZodToTsOptions } from './zod-to-ts.js';
 
 const { factory: f, SyntaxKind, ScriptKind, ScriptTarget, EmitHint } = ts;
 
-export const maybeIdentifierToTypeReference = (
+export function maybeIdentifierToTypeReference(
   identifier: ts.Identifier | ts.TypeNode,
-) => {
+) {
   if (ts.isIdentifier(identifier)) {
     return f.createTypeReferenceNode(identifier);
   }
 
   return identifier;
-};
+}
 
-export const createTypeReferenceFromString = (identifier: string) =>
-  f.createTypeReferenceNode(f.createIdentifier(identifier));
+export function createTypeReferenceFromString(identifier: string) {
+  return f.createTypeReferenceNode(f.createIdentifier(identifier));
+}
 
-export const createUnknownKeywordNode = () =>
-  f.createKeywordTypeNode(SyntaxKind.UnknownKeyword);
+export function createUnknownKeywordNode() {
+  return f.createKeywordTypeNode(SyntaxKind.UnknownKeyword);
+}
 
-export const createTypeAlias = (
+export function createTypeAlias(
   node: ts.TypeNode,
   identifier: string,
   comment?: string,
-) => {
+) {
   const typeAlias = f.createTypeAliasDeclaration(
     undefined,
     f.createIdentifier(identifier),
@@ -39,12 +41,9 @@ export const createTypeAlias = (
   }
 
   return typeAlias;
-};
+}
 
-export const printNode = (
-  node: ts.Node,
-  printerOptions?: ts.PrinterOptions,
-) => {
+export function printNode(node: ts.Node, printerOptions?: ts.PrinterOptions) {
   const sourceFile = ts.createSourceFile(
     'print.ts',
     '',
@@ -55,74 +54,118 @@ export const printNode = (
   const printer = ts.createPrinter(printerOptions);
 
   return printer.printNode(EmitHint.Unspecified, node, sourceFile);
-};
+}
 
-interface PrintZodToTsOptions extends ZodToTsOptions, ts.PrinterOptions {
+function isArray(value: unknown): value is readonly any[] | any[] {
+  return Array.isArray(value);
+}
+
+export interface ConvertZodToTsOptions
+  extends Omit<ZodToTsOptions, 'identifiers'> {
   /**
-   * A map of Schema Name -> Zod Schema.
+   * The list of Zod schemas to convert to TypeScript types.
    *
-   * The schema name will be used as the identifier.
+   * If more than one schema is provided, each schema must have a unique identifier in its
+   * metadata, which will be used as the TypeScript type name.
+   * You can set the identifier using the `meta` method on the schema.
    *
-   * If a single schema is provided, it can be provided as a single Zod schema instead of a record.
-   * In that case, it will not be assigned an identifier and will be printed as a type literal.
+   * Only schemas that are listed here will be deduplicated and replaced with identifiers,
+   * while all other discovered schemas will be inlined in place.
    */
-  schemas: Record<string, $ZodType> | $ZodType;
+  schemas: $ZodType | readonly $ZodType[];
 }
 
 export function convertZodToTs(
-  options: PrintZodToTsOptions,
-): readonly ts.TypeNode[] {
-  const { schemas, nativeEnums, ...printerOptions } = options;
+  options: ConvertZodToTsOptions,
+): readonly ts.Node[] {
+  const { schemas } = options;
 
-  const nodes: ts.TypeNode[] = [];
+  const nodes: ts.Node[] = [];
 
-  const zodToTsOptions: Required<ZodToTsOptions> = { nativeEnums };
+  if (isArray(schemas)) {
+    const zodToTsOptions: Required<ZodToTsOptions> = { identifiers: schemas };
 
-  if (util.isPlainObject(schemas)) {
-    for (const schemaIdentifier of Object.keys(schemas)) {
-      nodes.push(
-        zodToTs(schemas[schemaIdentifier], schemaIdentifier, zodToTsOptions)
-          .node,
-      );
+    for (const schema of schemas) {
+      if (schemas.length > 1 && !getSchemaIdentifier(schema)) {
+        throw new Error(
+          'When multiple schemas are provided, each schema in the array must have a unique identifier set in its metadata using the `meta` method.',
+        );
+      }
+
+      nodes.push(zodToTs(schema, zodToTsOptions));
     }
   } else {
+    const zodToTsOptions: Required<ZodToTsOptions> = { identifiers: undefined };
+
     // If a single schema is provided, we do not assign an identifier.
-    nodes.push(zodToTs(schemas, undefined, zodToTsOptions).node);
+    nodes.push(zodToTs(schemas, zodToTsOptions));
   }
 
   return nodes;
 }
 
-export function printZodAsTs(options: PrintZodToTsOptions): string {
-  return convertZodToTs(options)
-    .map((node) => printNode(node, options))
+export interface PrintZodAsTsOptions
+  extends ConvertZodToTsOptions,
+    ts.PrinterOptions {}
+
+export function printZodAsTs({
+  schemas,
+  ...printerOptions
+}: PrintZodAsTsOptions): string {
+  const convertZodToTsOptions: Required<ConvertZodToTsOptions> = {
+    schemas,
+  };
+
+  return convertZodToTs(convertZodToTsOptions)
+    .map((node) => printNode(node, printerOptions))
     .join('\n\n');
 }
 
-export const withGetType = <T extends $ZodType & GetType>(
-  schema: T,
-  getType: GetTypeFunction,
-): T => {
-  schema._def.getType = getType;
-
-  return schema;
-};
-
 const identifierRE = /^[$A-Z_a-z][\w$]*$/;
 
-export const getIdentifierOrStringLiteral = (string_: string) => {
+export function getIdentifierOrStringLiteral(string_: string) {
   if (identifierRE.test(string_)) {
     return f.createIdentifier(string_);
   }
 
   return f.createStringLiteral(string_);
-};
+}
 
-export const addJsDocComment = (node: ts.Node, text: string) => {
+export function addJsDocComment(node: ts.Node, text: string) {
   ts.addSyntheticLeadingComment(
     node,
     SyntaxKind.MultiLineCommentTrivia,
     `* ${text} `,
     true,
   );
-};
+}
+
+export function getSchemaDescription(schema: $ZodType): string | undefined {
+  return globalRegistry.get(schema)?.description;
+}
+
+export function getSchemaIdentifier(schema: $ZodType): string | undefined {
+  const id = globalRegistry.get(schema)?.id;
+
+  if (id) {
+    return id;
+  }
+
+  const parent = schema._zod.parent;
+  if (parent) {
+    return getSchemaIdentifier(parent);
+  }
+
+  return undefined;
+}
+
+// !TODO:
+// - figure out how to detect that a described schema is the same as an undescribed one (isEqual?)
+
+export function isSchemaOptional(schema: $ZodType) {
+  return safeParse(schema, undefined).success;
+}
+
+export function isSchemaNullable(schema: $ZodType) {
+  return safeParse(schema, null).success;
+}

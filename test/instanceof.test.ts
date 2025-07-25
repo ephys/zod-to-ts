@@ -3,6 +3,8 @@ import { z } from 'zod';
 import { withGetType, zodToTs } from '../src/index.js';
 import { printNodeTest } from './utils.js';
 
+// !TODO: ability to overwrite TS output
+
 const dateType = withGetType(z.instanceof(Date), (ts) =>
   ts.factory.createIdentifier('Date'),
 );
