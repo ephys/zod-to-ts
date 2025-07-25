@@ -34,7 +34,6 @@ import { globalRegistry, util } from 'zod/v4/core';
 import type { TsZodRegistry } from './utils.js';
 import {
   addJsDocComment,
-  createTypeAlias,
   createTypeReferenceFromString,
   createUnknownKeywordNode,
   getIdentifierOrStringLiteral,
@@ -46,6 +45,11 @@ import {
 const { factory: f, SyntaxKind } = ts;
 
 export interface ZodToTsOptions {
+  /**
+   * Whether the node should be exported. Requires an identifier to be set on the schema.
+   */
+  export?: boolean;
+
   /**
    * The list of other Zod schemas that should be replaced by identifiers instead of inlining their typing.
    *
@@ -80,12 +84,32 @@ export function zodToNode(schema: $ZodType, options?: ZodToTsOptions): ts.Node {
     options?.registry ?? globalRegistry,
   );
 
-  if (identifier) {
-    return createTypeAlias(
-      node,
-      identifier,
-      getSchemaDescription(schema, options?.registry ?? globalRegistry),
+  if (options?.export && !identifier) {
+    throw new Error(
+      'Cannot export a Zod schema without an identifier. Please set an identifier using the `meta({ id: "MySchema" })` method on the schema.',
     );
+  }
+
+  if (identifier) {
+    const description = getSchemaDescription(
+      schema,
+      options?.registry ?? globalRegistry,
+    );
+
+    const typeAlias = f.createTypeAliasDeclaration(
+      options?.export
+        ? [ts.factory.createModifier(ts.SyntaxKind.ExportKeyword)]
+        : undefined,
+      f.createIdentifier(identifier),
+      undefined,
+      node,
+    );
+
+    if (description) {
+      addJsDocComment(typeAlias, description);
+    }
+
+    return typeAlias;
   }
 
   return node;

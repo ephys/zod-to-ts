@@ -1,6 +1,11 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 import { z } from 'zod';
+import { globalRegistry } from 'zod/v4/core';
 import { printZodAsTs } from '../src/index.js';
+
+afterEach(() => {
+  globalRegistry.clear();
+});
 
 describe('zod-to-ts', () => {
   it('detects circular references', () => {
@@ -34,5 +39,44 @@ describe('zod-to-ts', () => {
     "/** A string */
     type MyString = string;"
     `);
+  });
+
+  it('supports exporting schemas', () => {
+    const MyStringSchema = z.string().meta({ id: 'MyString' });
+
+    const output = printZodAsTs({
+      exportedSchemas: [MyStringSchema],
+    });
+
+    expect(output).toMatchInlineSnapshot(`
+    "export type MyString = string;"
+    `);
+  });
+
+  it('throws if trying to export a schema without an ID', () => {
+    const MyStringSchema = z.string();
+
+    expect(() =>
+      printZodAsTs({
+        exportedSchemas: [MyStringSchema],
+      }),
+    ).toThrowError(`Cannot export a Zod schema without an identifier`);
+  });
+
+  it('supports not outputing a schema but still using it as a reference', () => {
+    const TypeA = z.string().meta({ id: 'TypeA' });
+    const TypeB = z.object({
+      a: TypeA,
+    });
+
+    const output = printZodAsTs({
+      schemas: TypeB,
+      hiddenSchemas: [TypeA],
+    });
+
+    expect(output).toMatchInlineSnapshot(`
+    "{
+    a: TypeA;
+}"`);
   });
 });

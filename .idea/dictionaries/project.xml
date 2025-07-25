@@ -2,6 +2,7 @@
   <dictionary name="project">
     <words>
       <w>ephys</w>
+      <w>outputable</w>
       <w>prefault</w>
     </words>
   </dictionary>

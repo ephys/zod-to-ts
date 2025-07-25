@@ -1,3 +1,4 @@
+import { EMPTY_ARRAY } from '@sequelize/utils';
 import ts from 'typescript';
 import type { $ZodRegistry, $ZodType, JSONSchemaMeta } from 'zod/v4/core';
 import { globalRegistry, safeParse } from 'zod/v4/core';
@@ -56,7 +57,19 @@ function isArray(value: unknown): value is readonly any[] | any[] {
 }
 
 export interface ConvertZodToTsOptions
-  extends Omit<ZodToTsOptions, 'identifiers'> {
+  extends Omit<ZodToTsOptions, 'identifiers' | 'export'> {
+  /**
+   * Behaves like 'schemas', but they will also be exported as named exports.
+   */
+  exportedSchemas?: readonly $ZodType[] | undefined;
+
+  /**
+   * Behaves like 'schemas', but the schemas will not be included in the output.
+   * This is useful when you want to replace a schema with an identifier that is imported from
+   * another file instead of duplicating the schema in the output.
+   */
+  hiddenSchemas?: readonly $ZodType[] | undefined;
+
   /**
    * The list of Zod schemas to convert to TypeScript types.
    *
@@ -67,44 +80,61 @@ export interface ConvertZodToTsOptions
    * Only schemas that are listed here will be deduplicated and replaced with identifiers,
    * while all other discovered schemas will be inlined in place.
    */
-  schemas: $ZodType | readonly $ZodType[];
+  schemas?: $ZodType | readonly $ZodType[] | undefined;
 }
 
 export function convertZodToTs(
   options: ConvertZodToTsOptions,
 ): readonly ts.Node[] {
-  const { schemas, overwriteTsOutput, registry } = options;
+  const {
+    schemas,
+    exportedSchemas = EMPTY_ARRAY,
+    hiddenSchemas = EMPTY_ARRAY,
+    overwriteTsOutput,
+    registry,
+  } = options;
+
+  const outputableSchemas = new Set([
+    ...(!schemas ? EMPTY_ARRAY : isArray(schemas) ? schemas : [schemas]),
+    ...exportedSchemas,
+  ]);
+
+  for (const schema of hiddenSchemas) {
+    if (outputableSchemas.has(schema)) {
+      throw new Error(
+        'A schema cannot be both outputable and hidden. Please ensure that schemas in `hiddenSchemas` are not also in `schemas` or `exportedSchemas`.',
+      );
+    }
+
+    if (!getSchemaIdentifier(schema, registry ?? globalRegistry)) {
+      throw new Error(
+        'A schema in `hiddenSchemas` must have a unique identifier set in its metadata using the `meta` method.',
+      );
+    }
+  }
+
+  const identifiers = [...new Set([...outputableSchemas, ...hiddenSchemas])];
 
   const nodes: ts.Node[] = [];
 
-  if (isArray(schemas)) {
-    const zodToTsOptions: Required<ZodToTsOptions> = {
-      identifiers: schemas,
-      overwriteTsOutput,
-      registry,
-    };
-
-    for (const schema of schemas) {
-      if (
-        schemas.length > 1 &&
-        !getSchemaIdentifier(schema, options.registry ?? globalRegistry)
-      ) {
-        throw new Error(
-          'When multiple schemas are provided, each schema in the array must have a unique identifier set in its metadata using the `meta` method.',
-        );
-      }
-
-      nodes.push(zodToNode(schema, zodToTsOptions));
+  for (const schema of outputableSchemas) {
+    if (
+      outputableSchemas.size > 1 &&
+      !getSchemaIdentifier(schema, options.registry ?? globalRegistry)
+    ) {
+      throw new Error(
+        'When multiple schemas are provided, each schema in the array must have a unique identifier set in its metadata using the `meta` method.',
+      );
     }
-  } else {
+
     const zodToTsOptions: Required<ZodToTsOptions> = {
-      identifiers: [schemas],
+      identifiers,
       overwriteTsOutput,
       registry,
+      export: exportedSchemas.includes(schema),
     };
 
-    // If a single schema is provided, we do not assign an identifier.
-    nodes.push(zodToNode(schemas, zodToTsOptions));
+    nodes.push(zodToNode(schema, zodToTsOptions));
   }
 
   return nodes;
@@ -118,12 +148,16 @@ export function printZodAsTs({
   schemas,
   registry,
   overwriteTsOutput,
+  exportedSchemas,
+  hiddenSchemas,
   ...printerOptions
 }: PrintZodAsTsOptions): string {
   const convertZodToTsOptions: Required<ConvertZodToTsOptions> = {
     overwriteTsOutput,
     registry,
     schemas,
+    exportedSchemas,
+    hiddenSchemas,
   };
 
   return convertZodToTs(convertZodToTsOptions)
