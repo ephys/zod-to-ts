@@ -5,4 +5,8 @@ export {
   type ConvertZodToTsOptions,
   type PrintZodAsTsOptions,
 } from './utils.js';
-export { zodToTs } from './zod-to-ts.js';
+export {
+  zodToNode,
+  zodToTypeNode,
+  zodToTypeOrIdentifierNode,
+} from './zod-to-ts.js';

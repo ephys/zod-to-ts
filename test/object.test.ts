@@ -1,5 +1,5 @@
 /* eslint-disable no-useless-escape */
-import { expect, it } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import { printZodAsTs } from '../src/index.js';
 
@@ -179,4 +179,34 @@ it('supports zod.describe()', () => {
 		    price: number;
 		}"
 	`);
+});
+
+it('supports zod.object().readonly()', () => {
+  const schema = z
+    .object({
+      name: z.string(),
+      age: z.number(),
+    })
+    .readonly();
+
+  expect(printZodAsTs({ schemas: schema })).toMatchInlineSnapshot(`
+    "{
+        readonly name: string;
+        readonly age: number;
+    }"
+  `);
+});
+
+describe('record', () => {
+  it('supports zod.record()', () => {
+    expect(printZodAsTs({ schemas: z.record(z.string(), z.number()) })).toEqual(
+      'Record<string, number>',
+    );
+  });
+
+  it('supports zod.record().readonly()', () => {
+    expect(
+      printZodAsTs({ schemas: z.record(z.string(), z.number()).readonly() }),
+    ).toEqual('Readonly<Record<string, number>>');
+  });
 });

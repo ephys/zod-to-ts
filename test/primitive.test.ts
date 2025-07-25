@@ -15,6 +15,9 @@ describe('primitives', () => {
     [z.unknown(), 'unknown'],
     [z.never(), 'never'],
     [z.bigint(), 'bigint'],
+    [z.symbol(), 'symbol'],
+    [z.int(), 'number'],
+    [z.nan(), 'number'],
   ])('supports $1', (schema, result) => {
     expect(
       printZodAsTs({

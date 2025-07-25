@@ -9,7 +9,7 @@ describe('literals', () => {
     [z.literal('hello'), '"hello"'],
     [z.literal(42), '42'],
     [z.literal(3.14), '3.14'],
-    [z.literal(12345678901234567890n), '12345678901234567890n'],
+    [z.literal(12_345_678_901_234_567_890n), '12345678901234567890n'],
     [z.literal(null), 'null'],
     [z.literal(undefined), 'undefined'],
     [z.literal(['a', 'b', 'c']), '"a" | "b" | "c"'],

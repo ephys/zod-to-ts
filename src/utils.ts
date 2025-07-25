@@ -1,20 +1,10 @@
 import ts from 'typescript';
 import type { $ZodType } from 'zod/v4/core';
 import { globalRegistry, safeParse } from 'zod/v4/core';
-import { zodToTs } from './index.js';
-import { ZodToTsOptions } from './zod-to-ts.js';
+import type { ZodToTsOptions } from './zod-to-ts.js';
+import { zodToNode } from './zod-to-ts.js';
 
 const { factory: f, SyntaxKind, ScriptKind, ScriptTarget, EmitHint } = ts;
-
-export function maybeIdentifierToTypeReference(
-  identifier: ts.Identifier | ts.TypeNode,
-) {
-  if (ts.isIdentifier(identifier)) {
-    return f.createTypeReferenceNode(identifier);
-  }
-
-  return identifier;
-}
 
 export function createTypeReferenceFromString(identifier: string) {
   return f.createTypeReferenceNode(f.createIdentifier(identifier));
@@ -95,7 +85,7 @@ export function convertZodToTs(
         );
       }
 
-      nodes.push(zodToTs(schema, zodToTsOptions));
+      nodes.push(zodToNode(schema, zodToTsOptions));
     }
   } else {
     const zodToTsOptions: Required<ZodToTsOptions> = {
@@ -104,7 +94,7 @@ export function convertZodToTs(
     };
 
     // If a single schema is provided, we do not assign an identifier.
-    nodes.push(zodToTs(schemas, zodToTsOptions));
+    nodes.push(zodToNode(schemas, zodToTsOptions));
   }
 
   return nodes;

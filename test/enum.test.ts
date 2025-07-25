@@ -34,9 +34,9 @@ describe('Enum', () => {
 
   it('supports native TS enums', () => {
     enum Color {
-      Red,
-      Green,
-      Blue,
+      Red = 0,
+      Green = 1,
+      Blue = 2,
     }
 
     const Enum = z.enum(Color);

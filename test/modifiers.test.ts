@@ -1,6 +1,31 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 import { z } from 'zod';
+import { globalRegistry } from 'zod/v4/core';
 import { printZodAsTs } from '../src/index.js';
+
+afterEach(() => {
+  globalRegistry.clear();
+});
+
+type User = {
+  mother: User;
+};
+
+describe('z.lazy() referencing root type', () => {
+  it('outputs correct typescript', () => {
+    const UserSchema: z.ZodSchema<User> = z
+      .object({
+        mother: z.lazy(() => UserSchema),
+      })
+      .meta({ id: 'User' });
+
+    expect(printZodAsTs({ schemas: UserSchema })).toMatchInlineSnapshot(`
+			"type User = {
+			    mother: User;
+			};"
+		`);
+  });
+});
 
 const OptionalStringSchema = z.string().optional();
 
@@ -31,6 +56,12 @@ describe('z.optional()', () => {
     ).toMatchInlineSnapshot('"string | undefined"');
   });
 
+  it('is not output multiple times', () => {
+    expect(
+      printZodAsTs({ schemas: OptionalStringSchema.optional().optional() }),
+    ).toMatchInlineSnapshot('"string | undefined"');
+  });
+
   it('should output `?:` and undefined union for optional properties', () => {
     expect(printZodAsTs({ schemas: ObjectWithOptionals }))
       .toMatchInlineSnapshot(`
@@ -52,17 +83,56 @@ describe('z.optional()', () => {
   });
 });
 
-const NullableUsernameSchema = z.object({
-  username: z.string().nullable(),
+describe('z.nonoptional()', () => {
+  it('has no impact on types', () => {
+    expect(
+      printZodAsTs({ schemas: z.nonoptional(z.string()) }),
+    ).toMatchInlineSnapshot('"string"');
+  });
+
+  it('Undoes z.optional()', () => {
+    expect(
+      printZodAsTs({ schemas: z.nonoptional(OptionalStringSchema) }),
+    ).toMatchInlineSnapshot('"string"');
+  });
+
+  it('can undo z.optional() inside of z.lazy()', () => {
+    const UserSchema: z.ZodSchema<User> = z
+      .object({
+        mother: z.lazy(() => UserSchema.optional()).nonoptional(),
+      })
+      .meta({ id: 'User' });
+
+    expect(printZodAsTs({ schemas: UserSchema })).toMatchInlineSnapshot(`
+      "type User = {
+          mother: User;
+      };"
+    `);
+  });
+
+  it('can undo z.optional() inside of unions', () => {
+    const schema = z
+      .union([z.string().optional(), z.number().optional()])
+      .nonoptional();
+
+    expect(printZodAsTs({ schemas: schema })).toMatchInlineSnapshot(`
+      "string | number"
+    `);
+  });
 });
 
 describe('z.nullable()', () => {
   it('outputs correct typescript', () => {
-    expect(printZodAsTs({ schemas: NullableUsernameSchema }))
-      .toMatchInlineSnapshot(`
-			"{
-			    username: string | null;
-			}"
-		`);
+    expect(
+      printZodAsTs({ schemas: z.string().nullable() }),
+    ).toMatchInlineSnapshot(`"string | null"`);
+  });
+
+  it('is not output multiple times', () => {
+    expect(
+      printZodAsTs({
+        schemas: z.string().nullable().optional().nullable().optional(),
+      }),
+    ).toMatchInlineSnapshot('"(string | null) | undefined"');
   });
 });

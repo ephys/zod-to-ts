@@ -18,4 +18,42 @@ describe('z.array()', () => {
 			}[]"
 		`);
   });
+
+  it('supports z.array().readonly()', () => {
+    expect(printZodAsTs({ schemas: z.string().array().readonly() })).toEqual(
+      'readonly string[]',
+    );
+
+    expect(printZodAsTs({ schemas: ItemsSchema.readonly() }))
+      .toMatchInlineSnapshot(`
+			"readonly {
+			    id: number;
+			    value: string;
+			}[]"
+		`);
+  });
+});
+
+describe('z.tuple()', () => {
+  it('outputs correct typescript', () => {
+    const TupleSchema = z.tuple([z.string(), z.number()]);
+
+    expect(printZodAsTs({ schemas: TupleSchema })).toMatchInlineSnapshot(`
+      "[
+          string,
+          number
+      ]"
+    `);
+  });
+
+  it('supports z.tuple().readonly()', () => {
+    const TupleSchema = z.tuple([z.string(), z.number()]).readonly();
+
+    expect(printZodAsTs({ schemas: TupleSchema })).toMatchInlineSnapshot(`
+      "readonly [
+          string,
+          number
+      ]"
+    `);
+  });
 });
