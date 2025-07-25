@@ -32,10 +32,6 @@ const OptionalStringSchema = z.string().optional();
 const ObjectWithOptionals = z.object({
   optional: OptionalStringSchema,
   required: z.string(),
-  transform: z
-    .number()
-    .optional()
-    .transform((number_) => number_),
   or: z.number().optional().or(z.string()),
   tuple: z
     .tuple([
@@ -68,7 +64,6 @@ describe('z.optional()', () => {
 			"{
 			    optional?: string | undefined;
 			    required: string;
-			    transform?: number | undefined;
 			    or?: (number | undefined) | string;
 			    tuple?: [
 			        string | undefined,
@@ -134,5 +129,23 @@ describe('z.nullable()', () => {
         schemas: z.string().nullable().optional().nullable().optional(),
       }),
     ).toMatchInlineSnapshot('"(string | null) | undefined"');
+  });
+});
+
+describe('z.default()', () => {
+  it('has no impact on types', () => {
+    expect(printZodAsTs({ schemas: z.number().default(0) })).toEqual('number');
+  });
+});
+
+describe('z.prefault()', () => {
+  it('has no impact on types', () => {
+    expect(printZodAsTs({ schemas: z.number().prefault(0) })).toEqual('number');
+  });
+});
+
+describe('z.catch()', () => {
+  it('has no impact on types', () => {
+    expect(printZodAsTs({ schemas: z.number().catch(0) })).toEqual('number');
   });
 });

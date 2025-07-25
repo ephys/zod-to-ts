@@ -5,7 +5,13 @@ import { printZodAsTs } from '../src/index.js';
 const DateSchema = z.instanceof(Date);
 
 describe('z.instanceof()', () => {
-  it('outputs correct typescript', () => {
+  it('is not supported', () => {
+    expect(() => printZodAsTs({ schemas: DateSchema })).toThrowError(
+      `Custom Zod types cannot be automatically converted to TypeScript`,
+    );
+  });
+
+  it('can be worked around using overwriteTsOutput', () => {
     expect(
       printZodAsTs({
         schemas: z.array(DateSchema),

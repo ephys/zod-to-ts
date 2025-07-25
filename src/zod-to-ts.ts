@@ -1,8 +1,16 @@
-import { EMPTY_OBJECT, isNumber } from '@sequelize/utils';
+import {
+  EMPTY_OBJECT,
+  isAnyObject,
+  isNumber,
+  isString,
+} from '@sequelize/utils';
 import ts from 'typescript';
 import type {
   $ZodArrayDef,
+  $ZodCatchDef,
+  $ZodDefaultDef,
   $ZodEnumDef,
+  $ZodIntersectionDef,
   $ZodLazyDef,
   $ZodLiteralDef,
   $ZodMapDef,
@@ -11,10 +19,13 @@ import type {
   $ZodObjectDef,
   $ZodOptionalDef,
   $ZodPipeDef,
+  $ZodPrefaultDef,
   $ZodPromiseDef,
   $ZodReadonlyDef,
   $ZodRecordDef,
   $ZodSetDef,
+  $ZodSuccessDef,
+  $ZodTemplateLiteralDef,
   $ZodTupleDef,
   $ZodType,
   $ZodUnionDef,
@@ -173,48 +184,8 @@ export function zodToTypeNode(
       // z.literal('hi') -> 'hi'
       const literalDef = def as $ZodLiteralDef<util.Literal>;
 
-      const tsTypes: ts.TypeNode[] = literalDef.values.map((literalValue) => {
-        // eslint-disable-next-line no-restricted-syntax
-        switch (typeof literalValue) {
-          case 'number': {
-            return f.createLiteralTypeNode(
-              f.createNumericLiteral(literalValue),
-            );
-          }
-
-          case 'boolean': {
-            return f.createLiteralTypeNode(
-              literalValue ? f.createTrue() : f.createFalse(),
-            );
-          }
-
-          case 'bigint': {
-            return f.createLiteralTypeNode(
-              f.createBigIntLiteral(`${literalValue.toString()}n`),
-            );
-          }
-
-          case 'string': {
-            return f.createLiteralTypeNode(f.createStringLiteral(literalValue));
-          }
-
-          case 'symbol': {
-            return f.createKeywordTypeNode(SyntaxKind.SymbolKeyword);
-          }
-
-          case 'object': {
-            return f.createLiteralTypeNode(f.createNull());
-          }
-
-          case 'undefined': {
-            return f.createKeywordTypeNode(SyntaxKind.UndefinedKeyword);
-          }
-
-          default: {
-            return createUnknownKeywordNode();
-          }
-        }
-      });
+      const tsTypes: ts.TypeNode[] =
+        literalDef.values.map(getPrimitiveTypeNode);
 
       if (tsTypes.length > 1) {
         return f.createUnionTypeNode(tsTypes);
@@ -319,6 +290,25 @@ export function zodToTypeNode(
       return f.createUnionTypeNode(types);
     }
 
+    case 'intersection': {
+      const interDef = def as $ZodIntersectionDef;
+
+      return f.createIntersectionTypeNode([
+        zodToTypeOrIdentifierNode(
+          interDef.left,
+          options,
+          [...path, currentSchema],
+          seenModifiers,
+        ),
+        zodToTypeOrIdentifierNode(
+          interDef.right,
+          options,
+          [...path, currentSchema],
+          seenModifiers,
+        ),
+      ]);
+    }
+
     case 'enum': {
       const enumDef = def as $ZodEnumDef;
 
@@ -409,7 +399,7 @@ export function zodToTypeNode(
       const pipeDef = def as $ZodPipeDef;
 
       return zodToTypeOrIdentifierNode(
-        pipeDef.in,
+        pipeDef.out,
         options,
         [...path, currentSchema],
         seenModifiers,
@@ -448,6 +438,10 @@ export function zodToTypeNode(
       }
 
       return node;
+    }
+
+    case 'file': {
+      return f.createTypeReferenceNode(f.createIdentifier('File'));
     }
 
     case 'map': {
@@ -504,36 +498,97 @@ export function zodToTypeNode(
       return f.createTypeReferenceNode(f.createIdentifier('Promise'), [type]);
     }
 
-    case 'file': {
-      throw new Error('Not implemented yet: "file" case');
-    }
+    case 'template_literal': {
+      const templateDef = def as $ZodTemplateLiteralDef;
+      if (templateDef.parts.length === 0) {
+        return f.createKeywordTypeNode(SyntaxKind.NeverKeyword);
+      }
 
-    case 'intersection': {
-      throw new Error('Not implemented yet: "intersection" case');
-    }
+      const [headPart, ...middleParts] = normalizeTemplateParts(
+        templateDef.parts,
+      );
 
-    case 'success': {
-      throw new Error('Not implemented yet: "success" case');
+      const head: ts.TemplateHead = f.createTemplateHead(headPart as string);
+      const spans: ts.TemplateLiteralTypeSpan[] = [];
+
+      for (let i = 0; i < middleParts.length; i += 2) {
+        const part = middleParts[i];
+
+        const typeNode =
+          isAnyObject(part) && '_zod' in part
+            ? zodToTypeOrIdentifierNode(
+                part,
+                options,
+                [...path, currentSchema],
+                EMPTY_OBJECT,
+              )
+            : getPrimitiveTypeNode(part);
+
+        spans.push(
+          f.createTemplateLiteralTypeSpan(
+            typeNode,
+            i === middleParts.length - 2
+              ? f.createTemplateTail(middleParts[i + 1] as string)
+              : f.createTemplateMiddle(middleParts[i + 1] as string),
+          ),
+        );
+      }
+
+      return f.createTemplateLiteralType(head, spans);
     }
 
     case 'transform': {
-      throw new Error('Not implemented yet: "transform" case');
+      throw new Error(
+        'Transforms cannot be automatically converted to TypeScript, as we cannot statically determine the type. If you need to use transforms, please use the `overwriteTsOutput` option to provide a custom TypeScript output for this schema.',
+      );
     }
 
     case 'default': {
-      throw new Error('Not implemented yet: "default" case');
+      // no-op
+      const defaultDef = def as $ZodDefaultDef;
+
+      return zodToTypeOrIdentifierNode(
+        defaultDef.innerType,
+        options,
+        [...path, currentSchema],
+        seenModifiers,
+      );
     }
 
     case 'prefault': {
-      throw new Error('Not implemented yet: "prefault" case');
+      // no-op
+      const prefaultDef = def as $ZodPrefaultDef;
+
+      return zodToTypeOrIdentifierNode(
+        prefaultDef.innerType,
+        options,
+        [...path, currentSchema],
+        seenModifiers,
+      );
+    }
+
+    case 'success': {
+      // no-op
+      const catchDef = def as $ZodSuccessDef;
+
+      return zodToTypeOrIdentifierNode(
+        catchDef.innerType,
+        options,
+        [...path, currentSchema],
+        seenModifiers,
+      );
     }
 
     case 'catch': {
-      throw new Error('Not implemented yet: "catch" case');
-    }
+      // no-op
+      const catchDef = def as $ZodCatchDef;
 
-    case 'template_literal': {
-      throw new Error('Not implemented yet: "template_literal" case');
+      return zodToTypeOrIdentifierNode(
+        catchDef.innerType,
+        options,
+        [...path, currentSchema],
+        seenModifiers,
+      );
     }
   }
 }
@@ -561,4 +616,88 @@ export function zodToTypeOrIdentifierNode(
   }
 
   return zodToTypeNode(currentSchema, options, path, seenModifiers);
+}
+
+/**
+ * Creating a TS template literal is a bit tricky.
+ * To simplify, we first normalize the template parts
+ * by combining subsequent string parts together
+ * and ensuring that there is a string part
+ * before and after each Zod schema part.
+ *
+ * We also need the resulting array to start and end with a string part.
+ */
+function normalizeTemplateParts<T>(parts: T[]): Array<T | string> {
+  const result: Array<T | string> = [];
+  let buffer = '';
+
+  for (const part of parts) {
+    if (isString(part)) {
+      buffer += part;
+    } else {
+      if (buffer) {
+        result.push(buffer);
+        buffer = '';
+      }
+
+      if (result.length > 0 && !isString(result.at(-1))) {
+        result.push('');
+      }
+
+      result.push(part);
+    }
+  }
+
+  if (buffer) {
+    result.push(buffer);
+  }
+
+  if (!isString(result[0])) {
+    result.unshift('');
+  }
+
+  if (!isString(result.at(-1))) {
+    result.push('');
+  }
+
+  return result;
+}
+
+function getPrimitiveTypeNode(value: util.Primitive) {
+  // eslint-disable-next-line no-restricted-syntax
+  switch (typeof value) {
+    case 'number': {
+      return f.createLiteralTypeNode(f.createNumericLiteral(value));
+    }
+
+    case 'boolean': {
+      return f.createLiteralTypeNode(value ? f.createTrue() : f.createFalse());
+    }
+
+    case 'bigint': {
+      return f.createLiteralTypeNode(
+        f.createBigIntLiteral(`${value.toString()}n`),
+      );
+    }
+
+    case 'string': {
+      return f.createLiteralTypeNode(f.createStringLiteral(value));
+    }
+
+    case 'symbol': {
+      return f.createKeywordTypeNode(SyntaxKind.SymbolKeyword);
+    }
+
+    case 'object': {
+      return f.createLiteralTypeNode(f.createNull());
+    }
+
+    case 'undefined': {
+      return f.createKeywordTypeNode(SyntaxKind.UndefinedKeyword);
+    }
+
+    default: {
+      return createUnknownKeywordNode();
+    }
+  }
 }
