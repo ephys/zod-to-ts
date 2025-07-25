@@ -1,6 +1,4 @@
 {
-	"root": true,
-	"extends": [
-		"@ephys/eslint-config-typescript"
-	]
+  "root": true,
+  "extends": ["@ephys/eslint-config-typescript"]
 }
