@@ -1,24 +1,26 @@
-import { describe, expect, it } from 'vitest'
-import { z } from 'zod'
-import { withGetType, zodToTs } from '../src'
-import { printNodeTest } from './utils'
+import { describe, expect, it } from 'vitest';
+import { z } from 'zod';
+import { printZodAsTs } from '../src/index.js';
 
-const dateType = withGetType(z.instanceof(Date), (ts) => ts.factory.createIdentifier('Date'))
-
-const schema = z.object({
-	name: z.string(),
-	date: dateType,
-})
+const DateSchema = z.instanceof(Date);
 
 describe('z.instanceof()', () => {
-	const { node } = zodToTs(schema, 'Item')
+  it('is not supported', () => {
+    expect(() => printZodAsTs({ schemas: DateSchema })).toThrowError(
+      `Custom Zod types cannot be automatically converted to TypeScript`,
+    );
+  });
 
-	it('outputs correct typescript', () => {
-		expect(printNodeTest(node)).toMatchInlineSnapshot(`
-			"{
-			    name: string;
-			    date: Date;
-			}"
-		`)
-	})
-})
+  it('can be worked around using overwriteTsOutput', () => {
+    expect(
+      printZodAsTs({
+        schemas: z.array(DateSchema),
+        overwriteTsOutput(schema, factory) {
+          if (schema === DateSchema) {
+            return factory.createTypeReferenceNode('Date', undefined);
+          }
+        },
+      }),
+    ).toEqual('Date[]');
+  });
+});

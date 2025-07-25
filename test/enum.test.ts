@@ -1,118 +1,76 @@
-import { describe, expect, it } from 'vitest'
-import { z } from 'zod'
-import { withGetType, zodToTs } from '../src'
-import { printNodeTest } from './utils'
+import { afterEach, describe, expect, it } from 'vitest';
+import { z } from 'zod';
+import { globalRegistry } from 'zod/v4/core';
+import { printZodAsTs } from '../src/utils.js';
 
-describe('Color enum', () => {
-	enum Color {
-		Red,
-		Green,
-		Blue,
-	}
+afterEach(() => {
+  globalRegistry.clear();
+});
 
-	it('uses identifier provided using `withGetType`', () => {
-		const schema = withGetType(
-			z.nativeEnum(Color),
-			(ts) => ts.factory.createIdentifier('Color'),
-		)
+describe('Enum', () => {
+  it('supports enum refs', () => {
+    const Enum = z
+      .enum({
+        ONE: 1,
+        TWO: 2,
+      })
+      .meta({ id: 'Enum' });
 
-		const { node } = zodToTs(schema)
+    const Test = z
+      .object({
+        key: Enum.describe('Comment for key'),
+      })
+      .meta({ id: 'Test' });
 
-		expect(printNodeTest(node)).toMatchInlineSnapshot('"Color"')
-	})
+    expect(printZodAsTs({ schemas: [Test, Enum] })).toMatchInlineSnapshot(`
+			"type Test = {
+			    /** Comment for key */
+			    key: Enum;
+			};
 
-	it('handles numeric literals with resolveNativeEnums', () => {
-		const schema = withGetType(
-			z.nativeEnum(Color),
-			(ts) => ts.factory.createIdentifier('Color'),
-		)
+			type Enum = 1 | 2;"
+		`);
+  });
 
-		const { store } = zodToTs(schema, undefined, { resolveNativeEnums: true })
+  it('supports native TS enums', () => {
+    enum Color {
+      Red = 0,
+      Green = 1,
+      Blue = 2,
+    }
 
-		expect(printNodeTest(store.nativeEnums[0])).toMatchInlineSnapshot(`
-			"enum Color {
-			    \\"0\\" = \\"Red\\",
-			    \\"1\\" = \\"Green\\",
-			    \\"2\\" = \\"Blue\\",
-			    Red = 0,
-			    Green = 1,
-			    Blue = 2
-			}"
-		`)
-	})
-})
+    const Enum = z.enum(Color);
 
-describe('Fruit enum', () => {
-	enum Fruit {
-		Apple = 'apple',
-		Banana = 'banana',
-		Cantaloupe = 'cantaloupe',
-	}
+    expect(printZodAsTs({ schemas: Enum })).toMatchInlineSnapshot(`
+      "0 | 1 | 2"
+    `);
+  });
 
-	it('handles string literals with resolveNativeEnums', () => {
-		const schema = withGetType(
-			z.nativeEnum(Fruit),
-			(ts) => ts.factory.createIdentifier('Fruit'),
-		)
+  it('supports native TS enums with string values', () => {
+    enum Fruit {
+      Apple = 'apple',
+      Banana = 'banana',
+      Cantaloupe = 'cantaloupe',
+    }
 
-		const { store } = zodToTs(schema, undefined, { nativeEnums: 'resolve' })
+    const Enum = z.enum(Fruit);
 
-		expect(printNodeTest(store.nativeEnums[0])).toMatchInlineSnapshot(`
-			"enum Fruit {
-			    Apple = \\"apple\\",
-			    Banana = \\"banana\\",
-			    Cantaloupe = \\"cantaloupe\\"
-			}"
-		`)
-	})
-})
+    expect(printZodAsTs({ schemas: Enum })).toMatchInlineSnapshot(`
+      ""apple" | "banana" | "cantaloupe""
+    `);
+  });
+});
 
 it('handles string literal properties', () => {
-	enum StringLiteral {
-		'Two Words',
-		'\'Quotes"',
-		'\\"Escaped\\"',
-	}
+  enum StringLiteral {
+    'Two Words' = 'Two Words',
+    '\'Quotes"' = '\'Quotes"',
+    '\\"Escaped\\"' = '\\"Escaped\\"',
+  }
 
-	const schema = withGetType(
-		z.nativeEnum(StringLiteral),
-		(ts) => ts.factory.createIdentifier('StringLiteral'),
-	)
+  const Enum = z.enum(StringLiteral);
 
-	const { store } = zodToTs(schema, undefined, { nativeEnums: 'resolve' })
-
-	expect(printNodeTest(store.nativeEnums[0])).toMatchInlineSnapshot(`
-		"enum StringLiteral {
-		    \\"0\\" = \\"Two Words\\",
-		    \\"1\\" = \\"'Quotes\\\\\\"\\",
-		    \\"2\\" = \\"\\\\\\\\\\\\\\"Escaped\\\\\\\\\\\\\\"\\",
-		    \\"Two Words\\" = 0,
-		    \\"'Quotes\\\\\\"\\" = 1,
-		    \\"\\\\\\\\\\\\\\"Escaped\\\\\\\\\\\\\\"\\" = 2
-		}"
-	`)
-})
-
-describe('convertNativeEnumToUnion option', () => {
-	it('handles number enum', () => {
-		enum Color {
-			Red,
-			Green,
-			Blue,
-		}
-		const schema = z.nativeEnum(Color)
-		const { node } = zodToTs(schema, undefined, { nativeEnums: 'union' })
-		expect(printNodeTest(node)).toMatchInlineSnapshot(`"\\"Red\\" | \\"Green\\" | \\"Blue\\" | 0 | 1 | 2"`)
-	})
-
-	it('handles string enum', () => {
-		enum Fruit {
-			Apple = 'apple',
-			Banana = 'banana',
-			Cantaloupe = 'cantaloupe',
-		}
-		const schema = z.nativeEnum(Fruit)
-		const { node } = zodToTs(schema, undefined, { nativeEnums: 'union' })
-		expect(printNodeTest(node)).toMatchInlineSnapshot(`"\\"apple\\" | \\"banana\\" | \\"cantaloupe\\""`)
-	})
-})
+  expect(printZodAsTs({ schemas: Enum })).toMatchInlineSnapshot(`
+		""Two Words" | "'Quotes\\"" | "\\\\\\"Escaped\\\\\\"""
+	`);
+});

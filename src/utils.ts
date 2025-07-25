@@ -1,57 +1,218 @@
-import ts from 'typescript'
-import { ZodTypeAny } from 'zod'
-import { GetType, GetTypeFunction } from './types'
-const { factory: f, SyntaxKind, ScriptKind, ScriptTarget, EmitHint } = ts
+import { EMPTY_ARRAY } from '@sequelize/utils';
+import ts from 'typescript';
+import type { $ZodRegistry, $ZodType, JSONSchemaMeta } from 'zod/v4/core';
+import { globalRegistry, safeParse } from 'zod/v4/core';
+import type { ZodToTsOptions } from './zod-to-ts.js';
+import { zodToNode } from './zod-to-ts.js';
 
-export const maybeIdentifierToTypeReference = (identifier: ts.Identifier | ts.TypeNode) => {
-	if (ts.isIdentifier(identifier)) {
-		return f.createTypeReferenceNode(identifier)
-	}
+const { factory: f, SyntaxKind, ScriptKind, ScriptTarget, EmitHint } = ts;
 
-	return identifier
+export interface TsSchemaMeta
+  extends Pick<JSONSchemaMeta, 'id' | 'description'> {}
+
+export type TsZodRegistry = $ZodRegistry<TsSchemaMeta>;
+
+export function createTypeReferenceFromString(identifier: string) {
+  return f.createTypeReferenceNode(f.createIdentifier(identifier));
 }
 
-export const createTypeReferenceFromString = (identifier: string) =>
-	f.createTypeReferenceNode(f.createIdentifier(identifier))
-
-export const createUnknownKeywordNode = () => f.createKeywordTypeNode(SyntaxKind.UnknownKeyword)
-
-export const createTypeAlias = (node: ts.TypeNode, identifier: string, comment?: string) => {
-	const typeAlias = f.createTypeAliasDeclaration(
-		undefined,
-		f.createIdentifier(identifier),
-		undefined,
-		node,
-	)
-
-	if (comment) {
-		addJsDocComment(typeAlias, comment)
-	}
-
-	return typeAlias
+export function createUnknownKeywordNode() {
+  return f.createKeywordTypeNode(SyntaxKind.UnknownKeyword);
 }
 
-export const printNode = (node: ts.Node, printerOptions?: ts.PrinterOptions) => {
-	const sourceFile = ts.createSourceFile('print.ts', '', ScriptTarget.Latest, false, ScriptKind.TS)
-	const printer = ts.createPrinter(printerOptions)
-	return printer.printNode(EmitHint.Unspecified, node, sourceFile)
+export function createTypeAlias(
+  node: ts.TypeNode,
+  identifier: string,
+  comment?: string,
+) {
+  const typeAlias = f.createTypeAliasDeclaration(
+    undefined,
+    f.createIdentifier(identifier),
+    undefined,
+    node,
+  );
+
+  if (comment) {
+    addJsDocComment(typeAlias, comment);
+  }
+
+  return typeAlias;
 }
 
-export const withGetType = <T extends ZodTypeAny & GetType>(schema: T, getType: GetTypeFunction): T => {
-	schema._def.getType = getType
-	return schema
+export function printNode(node: ts.Node, printerOptions?: ts.PrinterOptions) {
+  const sourceFile = ts.createSourceFile(
+    'print.ts',
+    '',
+    ScriptTarget.Latest,
+    false,
+    ScriptKind.TS,
+  );
+  const printer = ts.createPrinter(printerOptions);
+
+  return printer.printNode(EmitHint.Unspecified, node, sourceFile);
 }
 
-const identifierRE = /^[$A-Z_a-z][\w$]*$/
-
-export const getIdentifierOrStringLiteral = (string_: string) => {
-	if (identifierRE.test(string_)) {
-		return f.createIdentifier(string_)
-	}
-
-	return f.createStringLiteral(string_)
+function isArray(value: unknown): value is readonly any[] | any[] {
+  return Array.isArray(value);
 }
 
-export const addJsDocComment = (node: ts.Node, text: string) => {
-	ts.addSyntheticLeadingComment(node, SyntaxKind.MultiLineCommentTrivia, `* ${text} `, true)
+export interface ConvertZodToTsOptions
+  extends Omit<ZodToTsOptions, 'identifiers' | 'export'> {
+  /**
+   * Behaves like 'schemas', but they will also be exported as named exports.
+   */
+  exportedSchemas?: readonly $ZodType[] | undefined;
+
+  /**
+   * Behaves like 'schemas', but the schemas will not be included in the output.
+   * This is useful when you want to replace a schema with an identifier that is imported from
+   * another file instead of duplicating the schema in the output.
+   */
+  hiddenSchemas?: readonly $ZodType[] | undefined;
+
+  /**
+   * The list of Zod schemas to convert to TypeScript types.
+   *
+   * If more than one schema is provided, each schema must have a unique identifier in its
+   * metadata, which will be used as the TypeScript type name.
+   * You can set the identifier using the `meta` method on the schema.
+   *
+   * Only schemas that are listed here will be deduplicated and replaced with identifiers,
+   * while all other discovered schemas will be inlined in place.
+   */
+  schemas?: $ZodType | readonly $ZodType[] | undefined;
+}
+
+export function convertZodToTs(
+  options: ConvertZodToTsOptions,
+): readonly ts.Node[] {
+  const {
+    schemas,
+    exportedSchemas = EMPTY_ARRAY,
+    hiddenSchemas = EMPTY_ARRAY,
+    overwriteTsOutput,
+    registry,
+  } = options;
+
+  const outputableSchemas = new Set([
+    ...(!schemas ? EMPTY_ARRAY : isArray(schemas) ? schemas : [schemas]),
+    ...exportedSchemas,
+  ]);
+
+  for (const schema of hiddenSchemas) {
+    if (outputableSchemas.has(schema)) {
+      throw new Error(
+        'A schema cannot be both outputable and hidden. Please ensure that schemas in `hiddenSchemas` are not also in `schemas` or `exportedSchemas`.',
+      );
+    }
+
+    if (!getSchemaIdentifier(schema, registry ?? globalRegistry)) {
+      throw new Error(
+        'A schema in `hiddenSchemas` must have a unique identifier set in its metadata using the `meta` method.',
+      );
+    }
+  }
+
+  const identifiers = [...new Set([...outputableSchemas, ...hiddenSchemas])];
+
+  const nodes: ts.Node[] = [];
+
+  for (const schema of outputableSchemas) {
+    if (
+      outputableSchemas.size > 1 &&
+      !getSchemaIdentifier(schema, options.registry ?? globalRegistry)
+    ) {
+      throw new Error(
+        'When multiple schemas are provided, each schema in the array must have a unique identifier set in its metadata using the `meta` method.',
+      );
+    }
+
+    const zodToTsOptions: Required<ZodToTsOptions> = {
+      identifiers,
+      overwriteTsOutput,
+      registry,
+      export: exportedSchemas.includes(schema),
+    };
+
+    nodes.push(zodToNode(schema, zodToTsOptions));
+  }
+
+  return nodes;
+}
+
+export interface PrintZodAsTsOptions
+  extends ConvertZodToTsOptions,
+    ts.PrinterOptions {}
+
+export function printZodAsTs({
+  schemas,
+  registry,
+  overwriteTsOutput,
+  exportedSchemas,
+  hiddenSchemas,
+  ...printerOptions
+}: PrintZodAsTsOptions): string {
+  const convertZodToTsOptions: Required<ConvertZodToTsOptions> = {
+    overwriteTsOutput,
+    registry,
+    schemas,
+    exportedSchemas,
+    hiddenSchemas,
+  };
+
+  return convertZodToTs(convertZodToTsOptions)
+    .map((node) => printNode(node, printerOptions))
+    .join('\n\n');
+}
+
+const identifierRE = /^[$A-Z_a-z][\w$]*$/;
+
+export function getIdentifierOrStringLiteral(string_: string) {
+  if (identifierRE.test(string_)) {
+    return f.createIdentifier(string_);
+  }
+
+  return f.createStringLiteral(string_);
+}
+
+export function addJsDocComment(node: ts.Node, text: string) {
+  ts.addSyntheticLeadingComment(
+    node,
+    SyntaxKind.MultiLineCommentTrivia,
+    `* ${text} `,
+    true,
+  );
+}
+
+export function getSchemaDescription(
+  schema: $ZodType,
+  registry: TsZodRegistry,
+): string | undefined {
+  return registry.get(schema)?.description;
+}
+
+export function getSchemaIdentifier(
+  schema: $ZodType,
+  registry: TsZodRegistry,
+): string | undefined {
+  const id = registry.get(schema)?.id;
+
+  if (id) {
+    return id;
+  }
+
+  const parent = schema._zod.parent;
+  if (parent) {
+    return getSchemaIdentifier(parent, registry);
+  }
+
+  return undefined;
+}
+
+export function isSchemaOptional(schema: $ZodType) {
+  return safeParse(schema, undefined).success;
+}
+
+export function isSchemaNullable(schema: $ZodType) {
+  return safeParse(schema, null).success;
 }
