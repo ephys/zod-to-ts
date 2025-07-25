@@ -4,12 +4,9 @@
     "module": "Node16",
     "moduleResolution": "node16",
     "strict": true,
-    "esModuleInterop": true,
     "skipLibCheck": true,
-    "allowSyntheticDefaultImports": true,
     "forceConsistentCasingInFileNames": true,
     "noEmit": true,
-    "isolatedModules": true,
     "strictNullChecks": true,
     "exactOptionalPropertyTypes": true
   },
