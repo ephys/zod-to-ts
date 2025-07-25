@@ -2,6 +2,7 @@ import ts from 'typescript';
 import {
   $ZodArrayDef,
   $ZodEnumDef,
+  $ZodLazyDef,
   $ZodLiteralDef,
   $ZodNullableDef,
   $ZodObjectDef,
@@ -26,18 +27,24 @@ import {
 const { factory: f, SyntaxKind } = ts;
 
 export interface ZodToTsOptions {
-  // TODO: output as type vs interface
-
   /**
    * The list of other Zod schemas that should be replaced by identifiers instead of inlining their typing.
    *
    * Never applies to the main schema being printed.
    */
   identifiers?: readonly $ZodType[] | undefined;
+
+  /**
+   * Can be used to overwrite the default TypeScript output for a Zod schema.
+   * Return `undefined` to use the default output.
+   */
+  overwriteTsOutput?:
+    | ((input: $ZodType, factory: ts.NodeFactory) => ts.TypeNode | undefined)
+    | undefined;
 }
 
 export function zodToTs(schema: $ZodType, options?: ZodToTsOptions): ts.Node {
-  let node: ts.TypeNode = zodToTsNode(schema, schema, options);
+  let node: ts.TypeNode = zodToTypeNode(schema, options, []);
 
   const identifier = getSchemaIdentifier(schema);
 
@@ -48,21 +55,25 @@ export function zodToTs(schema: $ZodType, options?: ZodToTsOptions): ts.Node {
   return node;
 }
 
-function zodToTsNode(
-  root: $ZodType,
+function zodToTypeNode(
   currentSchema: $ZodType,
   options: ZodToTsOptions | undefined,
+  /**
+   * Used for loop detection.
+   */
+  path: readonly $ZodType[],
 ): ts.TypeNode {
-  if (currentSchema !== root && options?.identifiers) {
-    const id = getSchemaIdentifier(currentSchema);
+  if (path.includes(currentSchema)) {
+    throw new Error(
+      'Circular reference detected in Zod schema. To break the cycle, please assign identifiers to your schemas using the `meta({ id: "MySchema" })` method and add them to the `identifiers` (if using zodToTs) or `schemas` (if using the other methods) option.',
+    );
+  }
 
-    if (
-      id &&
-      options.identifiers.find(
-        (identifier) => getSchemaIdentifier(identifier) === id,
-      )
-    ) {
-      return createTypeReferenceFromString(id);
+  if (options?.overwriteTsOutput) {
+    const customType = options.overwriteTsOutput(currentSchema, f);
+
+    if (customType) {
+      return customType;
     }
   }
 
@@ -117,13 +128,14 @@ function zodToTsNode(
     }
 
     case 'lazy': {
-      // it is impossible to determine what the lazy value is referring to
-      // so we force the user to declare it
-      // if (!getTypeType) {
-      //   return createTypeReferenceFromString(identifier);
-      // }
+      const lazyDef = def as $ZodLazyDef;
 
-      break;
+      const subType = lazyDef.getter();
+
+      return zodToTypeOrIdentifierNode(subType, options, [
+        ...path,
+        currentSchema,
+      ]);
     }
 
     case 'literal': {
@@ -192,7 +204,10 @@ function zodToTsNode(
       const members: ts.TypeElement[] = properties.map(([key, value]) => {
         const nextZodNode = value as $ZodType;
 
-        const type = zodToTsNode(root, nextZodNode, options);
+        const type = zodToTypeOrIdentifierNode(nextZodNode, options, [
+          ...path,
+          currentSchema,
+        ]);
 
         const { type: nextZodNodeTypeName } = nextZodNode._zod.def;
         const isOptional =
@@ -226,7 +241,10 @@ function zodToTsNode(
     case 'array': {
       const arrayDef = def as $ZodArrayDef;
 
-      const type = zodToTsNode(root, arrayDef.element, options);
+      const type = zodToTypeOrIdentifierNode(arrayDef.element, options, [
+        ...path,
+        currentSchema,
+      ]);
 
       return f.createArrayTypeNode(type);
     }
@@ -234,17 +252,11 @@ function zodToTsNode(
     case 'union': {
       const unionDef = def as $ZodUnionDef;
       const types: ts.TypeNode[] = unionDef.options.map((option) =>
-        zodToTsNode(root, option, options),
+        zodToTypeOrIdentifierNode(option, options, [...path, currentSchema]),
       );
 
       return f.createUnionTypeNode(types);
     }
-
-    // case 'ZodEffects': {
-    // 	// ignore any effects, they won't factor into the types
-    // 	const node = zodToTsNode(zod.def.schema, ...otherArguments) as ts.TypeNode
-    // 	return node
-    // }
 
     case 'enum': {
       const enumDef = def as $ZodEnumDef;
@@ -263,7 +275,11 @@ function zodToTsNode(
     case 'optional': {
       const optionalDef = def as $ZodOptionalDef;
 
-      const innerType = zodToTsNode(root, optionalDef.innerType, options);
+      const innerType = zodToTypeOrIdentifierNode(
+        optionalDef.innerType,
+        options,
+        [...path, currentSchema],
+      );
 
       return f.createUnionTypeNode([
         innerType,
@@ -274,7 +290,11 @@ function zodToTsNode(
     case 'nullable': {
       const nullableDef = def as $ZodNullableDef;
 
-      const innerType = zodToTsNode(root, nullableDef.innerType, options);
+      const innerType = zodToTypeOrIdentifierNode(
+        nullableDef.innerType,
+        options,
+        [...path, currentSchema],
+      );
 
       return f.createUnionTypeNode([
         innerType,
@@ -285,103 +305,51 @@ function zodToTsNode(
     case 'tuple': {
       const tupleDef = def as $ZodTupleDef;
       const types = tupleDef.items.map((option) =>
-        zodToTsNode(root, option, options),
+        zodToTypeOrIdentifierNode(option, options, [...path, currentSchema]),
       );
 
       return f.createTupleTypeNode(types);
     }
-    //
-    // 	case 'record': {
-    // 		// z.record(z.number()) -> { [x: string]: number }
-    // 		const valueType = zodToTsNode(zod.def.valueType, ...otherArguments)
-    //
-    // 		const node = f.createTypeLiteralNode([f.createIndexSignature(
-    // 			undefined,
-    // 			[f.createParameterDeclaration(
-    // 				undefined,
-    // 				undefined,
-    // 				f.createIdentifier('x'),
-    // 				undefined,
-    // 				f.createKeywordTypeNode(SyntaxKind.StringKeyword),
-    // 			)],
-    // 			valueType,
-    // 		)])
-    //
-    // 		return node
-    // 	}
-    //
-    // 	case 'map': {
-    // 		// z.map(z.string()) -> Map<string>
-    // 		const valueType = zodToTsNode(zod.def.valueType, ...otherArguments)
-    // 		const keyType = zodToTsNode(zod.def.keyType, ...otherArguments)
-    //
-    // 		const node = f.createTypeReferenceNode(
-    // 			f.createIdentifier('Map'),
-    // 			[
-    // 				keyType,
-    // 				valueType,
-    // 			],
-    // 		)
-    //
-    // 		return node
-    // 	}
-    //
-    // 	case 'set': {
-    // 		// z.set(z.string()) -> Set<string>
-    // 		const type = zodToTsNode(zod.def.valueType, ...otherArguments)
-    //
-    // 		const node = f.createTypeReferenceNode(
-    // 			f.createIdentifier('Set'),
-    // 			[type],
-    // 		)
-    // 		return node
-    // 	}
-    //
-    // 	case 'intersection': {
-    // 		// z.number().and(z.string()) -> number & string
-    // 		const left = zodToTsNode(zod.def.left, ...otherArguments)
-    // 		const right = zodToTsNode(zod.def.right, ...otherArguments)
-    // 		const node = f.createIntersectionTypeNode([left, right])
-    // 		return node
-    // 	}
-    //
-    // 	case 'promise': {
-    // 		// z.promise(z.string()) -> Promise<string>
-    // 		const type = zodToTsNode(zod.def.type, ...otherArguments)
-    //
-    // 		const node = f.createTypeReferenceNode(
-    // 			f.createIdentifier('Promise'),
-    // 			[type],
-    // 		)
-    //
-    // 		return node
-    // 	}
-    //
-    // 	case 'default': {
-    // 		// z.string().optional().default('hi') -> string
-    // 		const type = zodToTsNode(zod.def.innerType, ...otherArguments) as ts.TypeNode
-    //
-    // 		const filteredNodes: ts.Node[] = []
-    //
-    // 		type.forEachChild((node) => {
-    // 			if (!([SyntaxKind.UndefinedKeyword].includes(node.kind))) {
-    // 				filteredNodes.push(node)
-    // 			}
-    // 		})
-    //
-    // 		// @ts-expect-error needed to set children
-    // 		type.types = filteredNodes
-    //
-    // 		return type
-    // 	}
 
     case 'pipe': {
       const pipeDef = def as $ZodPipeDef;
 
-      return zodToTsNode(root, pipeDef.in, options);
+      return zodToTypeOrIdentifierNode(pipeDef.in, options, [
+        ...path,
+        currentSchema,
+      ]);
+    }
+
+    case 'custom': {
+      throw new Error(
+        'Custom Zod types cannot be automatically converted to TypeScript. Please use overwriteTsOutput to generate the typings yourself for this schema.',
+      );
     }
   }
 
-  // !TODO: handle all cases
   throw new Error(`Unsupported Zod type: ${def.type}`);
+}
+
+function zodToTypeOrIdentifierNode(
+  currentSchema: $ZodType,
+  options: ZodToTsOptions | undefined,
+  /**
+   * Used for loop detection.
+   */
+  path: readonly $ZodType[],
+) {
+  if (options?.identifiers) {
+    const id = getSchemaIdentifier(currentSchema);
+
+    if (
+      id &&
+      options.identifiers.find(
+        (identifier) => getSchemaIdentifier(identifier) === id,
+      )
+    ) {
+      return createTypeReferenceFromString(id);
+    }
+  }
+
+  return zodToTypeNode(currentSchema, options, path);
 }

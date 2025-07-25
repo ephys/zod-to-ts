@@ -78,12 +78,15 @@ export interface ConvertZodToTsOptions
 export function convertZodToTs(
   options: ConvertZodToTsOptions,
 ): readonly ts.Node[] {
-  const { schemas } = options;
+  const { schemas, overwriteTsOutput } = options;
 
   const nodes: ts.Node[] = [];
 
   if (isArray(schemas)) {
-    const zodToTsOptions: Required<ZodToTsOptions> = { identifiers: schemas };
+    const zodToTsOptions: Required<ZodToTsOptions> = {
+      identifiers: schemas,
+      overwriteTsOutput,
+    };
 
     for (const schema of schemas) {
       if (schemas.length > 1 && !getSchemaIdentifier(schema)) {
@@ -95,7 +98,10 @@ export function convertZodToTs(
       nodes.push(zodToTs(schema, zodToTsOptions));
     }
   } else {
-    const zodToTsOptions: Required<ZodToTsOptions> = { identifiers: undefined };
+    const zodToTsOptions: Required<ZodToTsOptions> = {
+      identifiers: [schemas],
+      overwriteTsOutput,
+    };
 
     // If a single schema is provided, we do not assign an identifier.
     nodes.push(zodToTs(schemas, zodToTsOptions));
@@ -110,10 +116,12 @@ export interface PrintZodAsTsOptions
 
 export function printZodAsTs({
   schemas,
+  overwriteTsOutput,
   ...printerOptions
 }: PrintZodAsTsOptions): string {
   const convertZodToTsOptions: Required<ConvertZodToTsOptions> = {
     schemas,
+    overwriteTsOutput,
   };
 
   return convertZodToTs(convertZodToTsOptions)
@@ -158,9 +166,6 @@ export function getSchemaIdentifier(schema: $ZodType): string | undefined {
 
   return undefined;
 }
-
-// !TODO:
-// - figure out how to detect that a described schema is the same as an undescribed one (isEqual?)
 
 export function isSchemaOptional(schema: $ZodType) {
   return safeParse(schema, undefined).success;
