@@ -7,7 +7,9 @@ const DateSchema = z.instanceof(Date);
 describe('z.instanceof()', () => {
   it('is not supported', () => {
     expect(() => printZodAsTs({ schemas: DateSchema })).toThrowError(
-      `Custom Zod types cannot be automatically converted to TypeScript`,
+      `Custom Zod types cannot be automatically converted to TypeScript. Please use overwriteTsOutput to generate the typings yourself for this schema.
+
+Path:`,
     );
   });
 

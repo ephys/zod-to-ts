@@ -209,6 +209,23 @@ export function getSchemaIdentifier(
   return undefined;
 }
 
+export function getReadablePath(
+  label: string,
+  schema: $ZodType,
+  registry: TsZodRegistry | undefined,
+) {
+  // append type and schema identifier if available
+  const type = schema._zod.def.type;
+  const identifier = getSchemaIdentifier(schema, registry ?? globalRegistry);
+
+  const parts: string[] = [type];
+  if (identifier) {
+    parts.push(identifier);
+  }
+
+  return `${label} (${parts.join(', ')})`;
+}
+
 export function isSchemaOptional(schema: $ZodType) {
   return safeParse(schema, undefined).success;
 }

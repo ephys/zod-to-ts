@@ -1,4 +1,5 @@
 import {
+  EMPTY_ARRAY,
   EMPTY_OBJECT,
   isAnyObject,
   isNumber,
@@ -37,6 +38,7 @@ import {
   createTypeReferenceFromString,
   createUnknownKeywordNode,
   getIdentifierOrStringLiteral,
+  getReadablePath,
   getSchemaDescription,
   getSchemaIdentifier,
   isSchemaOptional,
@@ -77,7 +79,13 @@ export interface ZodToTsOptions {
 }
 
 export function zodToNode(schema: $ZodType, options?: ZodToTsOptions): ts.Node {
-  const node: ts.TypeNode = zodToTypeNode(schema, options, [], EMPTY_OBJECT);
+  const node: ts.TypeNode = zodToTypeNode(
+    schema,
+    options,
+    EMPTY_ARRAY,
+    [getReadablePath('#root', schema, options?.registry)],
+    EMPTY_OBJECT,
+  );
 
   const identifier = getSchemaIdentifier(
     schema,
@@ -129,11 +137,14 @@ export function zodToTypeNode(
    * Used for loop detection.
    */
   path: readonly $ZodType[],
+  readablePath: readonly string[],
   seenModifiers: SeenModifiers,
 ): ts.TypeNode {
   if (path.includes(currentSchema)) {
     throw new Error(
-      'Circular reference detected in Zod schema. To break the cycle, please assign identifiers to your schemas using the `meta({ id: "MySchema" })` method and add them to the `identifiers` (if using zodToTs) or `schemas` (if using the other methods) option.',
+      `Circular reference detected in Zod schema. To break the cycle, please assign identifiers to your schemas using the \`meta({ id: "MySchema" })\` method and add them to the \`identifiers\` (if using zodToTs) or \`schemas\` (if using the other methods) option.
+
+Path: ${readablePath.join(' → ')}`,
     );
   }
 
@@ -214,6 +225,7 @@ export function zodToTypeNode(
         subType,
         options,
         [...path, currentSchema],
+        readablePath,
         seenModifiers,
       );
     }
@@ -243,6 +255,10 @@ export function zodToTypeNode(
           nextZodNode,
           options,
           [...path, currentSchema],
+          [
+            ...readablePath,
+            getReadablePath(key, nextZodNode, options?.registry),
+          ],
           EMPTY_OBJECT,
         );
 
@@ -285,6 +301,10 @@ export function zodToTypeNode(
         arrayDef.element,
         options,
         [...path, currentSchema],
+        [
+          ...readablePath,
+          getReadablePath('#element', arrayDef.element, options?.registry),
+        ],
         EMPTY_OBJECT,
       );
 
@@ -299,11 +319,15 @@ export function zodToTypeNode(
 
     case 'tuple': {
       const tupleDef = def as $ZodTupleDef;
-      const types = tupleDef.items.map((option) =>
+      const types = tupleDef.items.map((option, i) =>
         zodToTypeOrIdentifierNode(
           option,
           options,
           [...path, currentSchema],
+          [
+            ...readablePath,
+            getReadablePath(`#option-${i}`, option, options?.registry),
+          ],
           EMPTY_OBJECT,
         ),
       );
@@ -319,11 +343,15 @@ export function zodToTypeNode(
 
     case 'union': {
       const unionDef = def as $ZodUnionDef;
-      const types: ts.TypeNode[] = unionDef.options.map((option) =>
+      const types: ts.TypeNode[] = unionDef.options.map((option, i) =>
         zodToTypeOrIdentifierNode(
           option,
           options,
           [...path, currentSchema],
+          [
+            ...readablePath,
+            getReadablePath(`#option-${i}`, option, options?.registry),
+          ],
           seenModifiers,
         ),
       );
@@ -339,12 +367,20 @@ export function zodToTypeNode(
           interDef.left,
           options,
           [...path, currentSchema],
+          [
+            ...readablePath,
+            getReadablePath('#left', interDef.left, options?.registry),
+          ],
           seenModifiers,
         ),
         zodToTypeOrIdentifierNode(
           interDef.right,
           options,
           [...path, currentSchema],
+          [
+            ...readablePath,
+            getReadablePath('#right', interDef.right, options?.registry),
+          ],
           seenModifiers,
         ),
       ]);
@@ -369,6 +405,7 @@ export function zodToTypeNode(
         (def as $ZodNonOptionalDef).innerType,
         options,
         [...path, currentSchema],
+        readablePath,
         {
           ...seenModifiers,
           nonOptional: !seenModifiers.optional,
@@ -383,6 +420,7 @@ export function zodToTypeNode(
         optionalDef.innerType,
         options,
         [...path, currentSchema],
+        readablePath,
         {
           ...seenModifiers,
           optional: !seenModifiers.nonOptional,
@@ -405,6 +443,7 @@ export function zodToTypeNode(
         (def as $ZodReadonlyDef).innerType,
         options,
         [...path, currentSchema],
+        readablePath,
         {
           ...seenModifiers,
           readonly: true,
@@ -419,6 +458,7 @@ export function zodToTypeNode(
         nullableDef.innerType,
         options,
         [...path, currentSchema],
+        readablePath,
         {
           ...seenModifiers,
           nullable: true,
@@ -443,13 +483,16 @@ export function zodToTypeNode(
         pipeDef.out,
         options,
         [...path, currentSchema],
+        readablePath,
         seenModifiers,
       );
     }
 
     case 'custom': {
       throw new Error(
-        'Custom Zod types cannot be automatically converted to TypeScript. Please use overwriteTsOutput to generate the typings yourself for this schema.',
+        `Custom Zod types cannot be automatically converted to TypeScript. Please use overwriteTsOutput to generate the typings yourself for this schema.
+
+Path: ${readablePath.join(' → ')}`,
       );
     }
 
@@ -462,12 +505,20 @@ export function zodToTypeNode(
           recordDef.keyType,
           options,
           [...path, currentSchema],
+          [
+            ...readablePath,
+            getReadablePath('#key', recordDef.keyType, options?.registry),
+          ],
           EMPTY_OBJECT,
         ),
         zodToTypeOrIdentifierNode(
           recordDef.valueType,
           options,
           [...path, currentSchema],
+          [
+            ...readablePath,
+            getReadablePath('#value', recordDef.valueType, options?.registry),
+          ],
           EMPTY_OBJECT,
         ),
       ]);
@@ -496,12 +547,20 @@ export function zodToTypeNode(
             mapDef.keyType,
             options,
             [...path, currentSchema],
+            [
+              ...readablePath,
+              getReadablePath('#key', mapDef.keyType, options?.registry),
+            ],
             EMPTY_OBJECT,
           ),
           zodToTypeOrIdentifierNode(
             mapDef.valueType,
             options,
             [...path, currentSchema],
+            [
+              ...readablePath,
+              getReadablePath('#value', mapDef.valueType, options?.registry),
+            ],
             EMPTY_OBJECT,
           ),
         ],
@@ -516,6 +575,10 @@ export function zodToTypeNode(
         setDef.valueType,
         options,
         [...path, currentSchema],
+        [
+          ...readablePath,
+          getReadablePath('#value', setDef.valueType, options?.registry),
+        ],
         EMPTY_OBJECT,
       );
 
@@ -533,6 +596,14 @@ export function zodToTypeNode(
         promiseDef.innerType,
         options,
         [...path, currentSchema],
+        [
+          ...readablePath,
+          getReadablePath(
+            '#innerType',
+            promiseDef.innerType,
+            options?.registry,
+          ),
+        ],
         EMPTY_OBJECT,
       );
 
@@ -561,6 +632,10 @@ export function zodToTypeNode(
                 part,
                 options,
                 [...path, currentSchema],
+                [
+                  ...readablePath,
+                  getReadablePath(`#part`, part, options?.registry),
+                ],
                 EMPTY_OBJECT,
               )
             : getPrimitiveTypeNode(part);
@@ -580,7 +655,9 @@ export function zodToTypeNode(
 
     case 'transform': {
       throw new Error(
-        'Transforms cannot be automatically converted to TypeScript, as we cannot statically determine the type. If you need to use transforms, please use the `overwriteTsOutput` option to provide a custom TypeScript output for this schema.',
+        `Transforms cannot be automatically converted to TypeScript, as we cannot statically determine the type. If you need to use transforms, please use the \`overwriteTsOutput\` option to provide a custom TypeScript output for this schema.
+
+Path: ${readablePath.join(' → ')}`,
       );
     }
 
@@ -592,6 +669,7 @@ export function zodToTypeNode(
         defaultDef.innerType,
         options,
         [...path, currentSchema],
+        readablePath,
         seenModifiers,
       );
     }
@@ -604,6 +682,7 @@ export function zodToTypeNode(
         prefaultDef.innerType,
         options,
         [...path, currentSchema],
+        readablePath,
         seenModifiers,
       );
     }
@@ -616,6 +695,7 @@ export function zodToTypeNode(
         catchDef.innerType,
         options,
         [...path, currentSchema],
+        readablePath,
         seenModifiers,
       );
     }
@@ -628,6 +708,7 @@ export function zodToTypeNode(
         catchDef.innerType,
         options,
         [...path, currentSchema],
+        readablePath,
         seenModifiers,
       );
     }
@@ -641,6 +722,7 @@ export function zodToTypeOrIdentifierNode(
    * Used for loop detection.
    */
   path: readonly $ZodType[],
+  readablePath: readonly string[],
   seenModifiers: SeenModifiers,
 ) {
   if (options?.identifiers) {
@@ -663,7 +745,13 @@ export function zodToTypeOrIdentifierNode(
     }
   }
 
-  return zodToTypeNode(currentSchema, options, path, seenModifiers);
+  return zodToTypeNode(
+    currentSchema,
+    options,
+    path,
+    readablePath,
+    seenModifiers,
+  );
 }
 
 /**

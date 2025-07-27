@@ -16,7 +16,10 @@ describe('zod-to-ts', () => {
 
     expect(() => {
       printZodAsTs({ schemas: UserSchema });
-    }).toThrowError(`Circular reference detected in Zod schema`);
+    })
+      .toThrowError(`Circular reference detected in Zod schema. To break the cycle, please assign identifiers to your schemas using the \`meta({ id: "MySchema" })\` method and add them to the \`identifiers\` (if using zodToTs) or \`schemas\` (if using the other methods) option.
+
+Path:`);
   });
 
   it('does not support comments on non-declaration outputs', () => {
@@ -78,5 +81,37 @@ describe('zod-to-ts', () => {
     "{
     a: TypeA;
 }"`);
+  });
+
+  it('provides a clear path to the part of the schema that caused an error', () => {
+    const NestedSchema = z.promise(
+      z.set(
+        z.map(
+          z.string(),
+          z.tuple([
+            z.intersection(
+              z.string(),
+              z
+                .union([
+                  z.string(),
+                  z.record(
+                    z.string(),
+                    z.object({
+                      myProp: z.array(z.instanceof(Date)),
+                    }),
+                  ),
+                ])
+                .meta({ id: 'MyUnion' }),
+            ),
+          ]),
+        ),
+      ),
+    );
+
+    expect(() => printZodAsTs({ schemas: NestedSchema })).toThrowError(
+      `Custom Zod types cannot be automatically converted to TypeScript. Please use overwriteTsOutput to generate the typings yourself for this schema.
+
+Path: #root (promise) → #innerType (set) → #value (map) → #value (tuple) → #option-0 (intersection) → #right (union, MyUnion) → #option-1 (record) → #value (object) → myProp (array) → #element (custom)`,
+    );
   });
 });
