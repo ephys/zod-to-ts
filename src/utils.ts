@@ -1,4 +1,5 @@
 import { EMPTY_ARRAY } from '@sequelize/utils';
+import dedent from 'dedent';
 import ts from 'typescript';
 import type { $ZodRegistry, $ZodType, JSONSchemaMeta } from 'zod/v4/core';
 import { globalRegistry, safeParse } from 'zod/v4/core';
@@ -33,7 +34,7 @@ export function createTypeAlias(
   );
 
   if (comment) {
-    addJsDocComment(typeAlias, comment);
+    addTsDocComment(typeAlias, comment);
   }
 
   return typeAlias;
@@ -212,13 +213,27 @@ export function getIdentifierOrStringLiteral(string_: string) {
   return f.createStringLiteral(string_);
 }
 
-export function addJsDocComment(node: ts.Node, text: string) {
-  ts.addSyntheticLeadingComment(
-    node,
-    SyntaxKind.MultiLineCommentTrivia,
-    `* ${text} `,
-    true,
-  );
+export function addTsDocComment(node: ts.Node, text: string) {
+  text = dedent(text);
+
+  if (text.includes('\n')) {
+    // If the text contains newlines, we need to split it into multiple lines
+    // and add a leading asterisk for each line.
+    const lines = text.replaceAll('\n', '\n * ');
+    ts.addSyntheticLeadingComment(
+      node,
+      SyntaxKind.MultiLineCommentTrivia,
+      `*\n * ${lines}\n `,
+      true,
+    );
+  } else {
+    ts.addSyntheticLeadingComment(
+      node,
+      SyntaxKind.MultiLineCommentTrivia,
+      `* ${text} `,
+      true,
+    );
+  }
 }
 
 export function getSchemaDescription(

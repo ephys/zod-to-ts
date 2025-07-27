@@ -86,6 +86,26 @@ it('inlines comments of non-outputted identifiers', () => {
   `);
 });
 
+it('formats multiline comments', () => {
+  const MyStringSchema = z
+    .object({
+      key: z.string().describe(`
+  A string
+    with multiple lines`),
+    })
+    .meta({ id: 'Root4' });
+
+  const output = printZodAsTs({ schemas: MyStringSchema });
+
+  expect(output).toEqual(`type Root4 = {
+    /**
+     * A string
+     *   with multiple lines
+     */
+    key: string;
+};`);
+});
+
 it('still recognizes the type alias if it is cloned for comment', () => {
   const Root = z
     .object({

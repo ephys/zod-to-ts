@@ -44,6 +44,24 @@ Path:`);
     `);
   });
 
+  it('formats multiline comments', () => {
+    const MyStringSchema = z
+      .string()
+      .describe(
+        `A string
+with multiple lines`,
+      )
+      .meta({ id: 'MyString' });
+
+    const output = printZodAsTs({ schemas: MyStringSchema });
+
+    expect(output).toEqual(`/**
+ * A string
+ * with multiple lines
+ */
+type MyString = string;`);
+  });
+
   it('supports exporting schemas', () => {
     const MyStringSchema = z.string().meta({ id: 'MyString' });
 

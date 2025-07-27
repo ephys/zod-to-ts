@@ -34,7 +34,7 @@ import type {
 import { globalRegistry, util } from 'zod/v4/core';
 import type { TsZodRegistry } from './utils.js';
 import {
-  addJsDocComment,
+  addTsDocComment,
   createTypeReferenceFromString,
   createUnknownKeywordNode,
   getIdentifierOrStringLiteral,
@@ -130,7 +130,7 @@ export function zodToNode(schema: $ZodType, options?: ZodToTsOptions): ts.Node {
     );
 
     if (description) {
-      addJsDocComment(typeAlias, description);
+      addTsDocComment(typeAlias, description);
     }
 
     return typeAlias;
@@ -318,7 +318,7 @@ Path: ${readablePath.join(' → ')}`,
               );
 
         if (description) {
-          addJsDocComment(propertySignature, description);
+          addTsDocComment(propertySignature, description);
         }
 
         return propertySignature;
