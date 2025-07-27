@@ -27,4 +27,17 @@ Path:`,
       }),
     ).toEqual('10');
   });
+
+  it('can be worked around using overwriteTsOutput with another Zod Schema', () => {
+    expect(
+      printZodAsTs({
+        schemas: TransformSchema,
+        overwriteTsOutput: (schema) => {
+          if (schema === TransformSchema) {
+            return z.string();
+          }
+        },
+      }),
+    ).toEqual('string');
+  });
 });

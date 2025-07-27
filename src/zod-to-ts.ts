@@ -61,6 +61,11 @@ export interface ZodToTsOptions {
 
   /**
    * Can be used to overwrite the default TypeScript output for a Zod schema.
+   * This is useful for custom Zod schemas that cannot be automatically converted to TypeScript (such as `z.instanceOf`).
+   *
+   * You can also return another schema to replace the current one.
+   * This is useful when using `z.transform`, as you can return a schema that represents the transformed type.
+   *
    * Return `undefined` to use the default output.
    */
   overwriteTsOutput?:
@@ -68,7 +73,7 @@ export interface ZodToTsOptions {
         input: $ZodType,
         factory: ts.NodeFactory,
         modifiers: SeenModifiers,
-      ) => ts.TypeNode | undefined)
+      ) => ts.TypeNode | $ZodType | undefined)
     | undefined;
 
   /**
@@ -156,6 +161,18 @@ Path: ${readablePath.join(' → ')}`,
     );
 
     if (customType) {
+      // If the custom type is a Zod schema, we need to convert it to a TypeScript node.
+      if ('_zod' in customType) {
+        return zodToTypeOrIdentifierNode(
+          customType,
+          options,
+          [...path, currentSchema],
+          readablePath,
+          seenModifiers,
+        );
+      }
+
+      // TypeScript node, return it directly.
       return customType;
     }
   }
