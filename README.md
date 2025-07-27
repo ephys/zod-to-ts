@@ -113,7 +113,7 @@ If you want to replace the generated TypeScript type with a custom one, you can 
 
 ```ts
 import { z } from 'zod';
-import { overwriteTsOutput, printZodAsTs } from '@ephys/zod-to-ts';
+import { printZodAsTs } from '@ephys/zod-to-ts';
 
 const DateSchema = z.instanceof(Date);
 
@@ -142,6 +142,43 @@ Result:
 type User = {
   username: string;
   bornAt: Date;
+};
+```
+
+You can also return another schema, which will be the one converted to TypeScript:
+
+```ts
+import { z } from 'zod';
+import { printZodAsTs } from '@ephys/zod-to-ts';
+
+const Name = z.string();
+const UpperCaseName = Name.transform((name) => name.toUpperCase());
+
+const UserSchema = z
+  .object({
+    username: UpperCaseName,
+  })
+  .meta({ id: 'User' });
+
+const typings = printZodAsTs({
+  schemas: [UserSchema],
+  overwriteTsOutput(zodType, factory, modifiers) {
+    // transforms cannot be converted to TypeScript types directly,
+    // so we can return the original schema to be converted instead
+    if (schema === UpperCaseName) {
+      return Name;
+    }
+
+    // if you do not return anything, the default schema will be used
+  },
+});
+```
+
+Result:
+
+```ts
+type User = {
+  username: string;
 };
 ```
 

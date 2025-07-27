@@ -271,3 +271,32 @@ describe('record', () => {
     `);
   });
 });
+
+it.only("detects optional properties, even if they're transformed schemas", () => {
+  const NameSchema = z.record(z.string(), z.string()).optional();
+
+  const ObjectSchema = z.object({
+    name: NameSchema.refine(
+      (obj) => (obj ? Object.keys(obj).length > 0 : true),
+      'test',
+    )
+      .transform((name) => name || 'default')
+      .describe('test'),
+  });
+
+  expect(
+    printZodAsTs({
+      schemas: ObjectSchema,
+      overwriteTsOutput(schema) {
+        if (schema === ObjectSchema.shape.name) {
+          return NameSchema;
+        }
+      },
+    }),
+  ).toMatchInlineSnapshot(`
+    "{
+        /** test */
+        name?: Record<string, string> | undefined;
+    }"
+  `);
+});

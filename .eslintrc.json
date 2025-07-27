@@ -1,4 +1,5 @@
 {
   "root": true,
-  "extends": ["@ephys/eslint-config-typescript"]
+  "extends": ["@ephys/eslint-config-typescript"],
+  "ignorePatterns": ["dist"]
 }
