@@ -66,6 +66,26 @@ it('supports comments on type identifiers', () => {
   `);
 });
 
+it('inlines comments of non-outputted identifiers', () => {
+  const Root = z
+    .object({
+      id: z.string(),
+      name: CommentedName,
+      age: z.number(),
+    })
+    .meta({ id: 'Root3' });
+
+  expect(printZodAsTs({ schemas: [Root], hiddenSchemas: [CommentedName] }))
+    .toMatchInlineSnapshot(`
+    "type Root3 = {
+        id: string;
+        /** Name type */
+        name: CommentedName;
+        age: number;
+    };"
+  `);
+});
+
 it('still recognizes the type alias if it is cloned for comment', () => {
   const Root = z
     .object({

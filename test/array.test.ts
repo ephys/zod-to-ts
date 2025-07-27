@@ -36,12 +36,13 @@ describe('z.array()', () => {
 
 describe('z.tuple()', () => {
   it('outputs correct typescript', () => {
-    const TupleSchema = z.tuple([z.string(), z.number()]);
+    const TupleSchema = z.tuple([z.string(), z.number()], z.boolean());
 
     expect(printZodAsTs({ schemas: TupleSchema })).toMatchInlineSnapshot(`
       "[
           string,
-          number
+          number,
+          ...boolean[]
       ]"
     `);
   });

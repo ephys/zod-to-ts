@@ -57,7 +57,10 @@ function isArray(value: unknown): value is readonly any[] | any[] {
 }
 
 export interface ConvertZodToTsOptions
-  extends Omit<ZodToTsOptions, 'identifiers' | 'export' | 'sortKeys'> {
+  extends Omit<
+    ZodToTsOptions,
+    'identifiers' | 'export' | 'sortKeys' | 'hiddenIdentifiers'
+  > {
   /**
    * Behaves like 'schemas', but they will also be exported as named exports.
    */
@@ -160,6 +163,7 @@ export function convertZodToTs(
     const zodToTsOptions: Required<ZodToTsOptions> = {
       export: exportedSchemas.includes(schema),
       identifiers,
+      hiddenIdentifiers: hiddenSchemas,
       overwriteTsOutput,
       registry,
       sortKeys: options.sort?.keys,

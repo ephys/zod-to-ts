@@ -53,6 +53,12 @@ export interface ZodToTsOptions {
   export?: boolean;
 
   /**
+   * The list of identifiers that will not be printed in the output.
+   * Only used for object property comments.
+   */
+  hiddenIdentifiers?: readonly $ZodType[] | undefined;
+
+  /**
    * The list of other Zod schemas that should be replaced by identifiers instead of inlining their typing.
    *
    * Never applies to the main schema being printed.
@@ -302,12 +308,14 @@ Path: ${readablePath.join(' → ')}`,
          * No need to duplicate the description if it will already be outputted
          * on the identifier.
          */
-        const description = options?.identifiers?.includes(nextZodNode)
-          ? undefined
-          : getSchemaDescription(
-              nextZodNode,
-              options?.registry ?? globalRegistry,
-            );
+        const description =
+          options?.identifiers?.includes(nextZodNode) &&
+          !options.hiddenIdentifiers?.includes(nextZodNode)
+            ? undefined
+            : getSchemaDescription(
+                nextZodNode,
+                options?.registry ?? globalRegistry,
+              );
 
         if (description) {
           addJsDocComment(propertySignature, description);
@@ -356,6 +364,25 @@ Path: ${readablePath.join(' → ')}`,
           EMPTY_OBJECT,
         ),
       );
+
+      if (tupleDef.rest) {
+        types.push(
+          f.createRestTypeNode(
+            f.createArrayTypeNode(
+              zodToTypeOrIdentifierNode(
+                tupleDef.rest,
+                options,
+                [...path, currentSchema],
+                [
+                  ...readablePath,
+                  getReadablePath('#rest', tupleDef.rest, options?.registry),
+                ],
+                EMPTY_OBJECT,
+              ),
+            ),
+          ),
+        );
+      }
 
       const tupleNode = f.createTupleTypeNode(types);
 
