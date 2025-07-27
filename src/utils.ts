@@ -57,7 +57,7 @@ function isArray(value: unknown): value is readonly any[] | any[] {
 }
 
 export interface ConvertZodToTsOptions
-  extends Omit<ZodToTsOptions, 'identifiers' | 'export'> {
+  extends Omit<ZodToTsOptions, 'identifiers' | 'export' | 'sortKeys'> {
   /**
    * Behaves like 'schemas', but they will also be exported as named exports.
    */
@@ -81,6 +81,22 @@ export interface ConvertZodToTsOptions
    * while all other discovered schemas will be inlined in place.
    */
   schemas?: $ZodType | readonly $ZodType[] | undefined;
+
+  sort?:
+    | {
+        /**
+         * Used to sort the type declarations in the output.
+         */
+        declarations?:
+          | ((this: void, a: string, b: string) => number)
+          | undefined;
+
+        /**
+         * Used to sort the keys of object schemas.
+         */
+        keys?: ZodToTsOptions['sortKeys'];
+      }
+    | undefined;
 }
 
 export function convertZodToTs(
@@ -126,12 +142,27 @@ export function convertZodToTs(
         'When multiple schemas are provided, each schema in the array must have a unique identifier set in its metadata using the `meta` method.',
       );
     }
+  }
 
+  const sortDeclarations = options.sort?.declarations;
+
+  const sortedOutputableSchemas =
+    sortDeclarations && outputableSchemas.size > 1
+      ? [...outputableSchemas].sort((a, b) =>
+          sortDeclarations(
+            getSchemaIdentifier(a, options.registry)!,
+            getSchemaIdentifier(b, options.registry)!,
+          ),
+        )
+      : outputableSchemas;
+
+  for (const schema of sortedOutputableSchemas) {
     const zodToTsOptions: Required<ZodToTsOptions> = {
+      export: exportedSchemas.includes(schema),
       identifiers,
       overwriteTsOutput,
       registry,
-      export: exportedSchemas.includes(schema),
+      sortKeys: options.sort?.keys,
     };
 
     nodes.push(zodToNode(schema, zodToTsOptions));
@@ -150,14 +181,16 @@ export function printZodAsTs({
   overwriteTsOutput,
   exportedSchemas,
   hiddenSchemas,
+  sort,
   ...printerOptions
 }: PrintZodAsTsOptions): string {
   const convertZodToTsOptions: Required<ConvertZodToTsOptions> = {
+    exportedSchemas,
+    hiddenSchemas,
     overwriteTsOutput,
     registry,
     schemas,
-    exportedSchemas,
-    hiddenSchemas,
+    sort,
   };
 
   return convertZodToTs(convertZodToTsOptions)
@@ -193,9 +226,9 @@ export function getSchemaDescription(
 
 export function getSchemaIdentifier(
   schema: $ZodType,
-  registry: TsZodRegistry,
+  registry: TsZodRegistry | undefined,
 ): string | undefined {
-  const id = registry.get(schema)?.id;
+  const id = (registry ?? globalRegistry).get(schema)?.id;
 
   if (id) {
     return id;

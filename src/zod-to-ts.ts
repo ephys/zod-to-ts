@@ -81,6 +81,11 @@ export interface ZodToTsOptions {
    * Defaults to the global registry.
    */
   registry?: TsZodRegistry | undefined;
+
+  /**
+   * Used to sort the keys of object schemas.
+   */
+  sortKeys: ((this: void, a: string, b: string) => number) | undefined;
 }
 
 export function zodToNode(schema: $ZodType, options?: ZodToTsOptions): ts.Node {
@@ -266,6 +271,9 @@ Path: ${readablePath.join(' → ')}`,
       const objectDef = def as $ZodObjectDef;
 
       const properties = Object.entries(objectDef.shape);
+      if (options?.sortKeys) {
+        properties.sort(([a], [b]) => options.sortKeys!(a, b));
+      }
 
       const members: ts.TypeElement[] = properties.map(([key, nextZodNode]) => {
         const type = zodToTypeOrIdentifierNode(

@@ -209,4 +209,25 @@ describe('record', () => {
       printZodAsTs({ schemas: z.record(z.string(), z.number()).readonly() }),
     ).toEqual('Readonly<Record<string, number>>');
   });
+
+  it('can sort object keys', () => {
+    const schema = z.object({
+      b: z.string(),
+      a: z.string(),
+      c: z.string(),
+    });
+
+    expect(
+      printZodAsTs({
+        schemas: schema,
+        sort: { keys: (a, b) => a.localeCompare(b) },
+      }),
+    ).toMatchInlineSnapshot(`
+      "{
+          a: string;
+          b: string;
+          c: string;
+      }"
+    `);
+  });
 });

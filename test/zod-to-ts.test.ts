@@ -114,4 +114,25 @@ Path:`);
 Path: #root (promise) → #innerType (set) → #value (map) → #value (tuple) → #option-0 (intersection) → #right (union, MyUnion) → #option-1 (record) → #value (object) → myProp (array) → #element (custom)`,
     );
   });
+
+  it('can sort types by schema name', () => {
+    const TypeA = z.string().meta({ id: 'TypeA' });
+    const TypeB = z.string().meta({ id: 'TypeB' });
+    const TypeC = z.string().meta({ id: 'TypeC' });
+
+    const output = printZodAsTs({
+      schemas: [TypeC, TypeA, TypeB],
+      sort: {
+        declarations: (a, b) => a.localeCompare(b),
+      },
+    });
+
+    expect(output).toMatchInlineSnapshot(`
+    "type TypeA = string;
+    
+    type TypeB = string;
+    
+    type TypeC = string;"
+    `);
+  });
 });
