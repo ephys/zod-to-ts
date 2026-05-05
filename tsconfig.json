@@ -8,7 +8,8 @@
     "forceConsistentCasingInFileNames": true,
     "noEmit": true,
     "strictNullChecks": true,
-    "exactOptionalPropertyTypes": true
+    "exactOptionalPropertyTypes": true,
+    "rootDir": "./src"
   },
   "include": ["src", "test"],
   "exclude": ["node_modules", "dist"]
