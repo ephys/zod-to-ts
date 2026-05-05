@@ -1,6 +1,6 @@
 {
   "name": "@ephys/zod-to-ts",
-  "version": "2.3.2",
+  "version": "2.4.0",
   "type": "module",
   "description": "Generate TypeScript types from your Zod schema",
   "repository": {
@@ -40,7 +40,7 @@
     "example": "tsx test/example.ts"
   },
   "peerDependencies": {
-    "typescript": "^4.9.4 || ^5.0.2",
+    "typescript": "^4.9.4 || ^5.0.2 || ^6.0.0",
     "zod": "^4"
   },
   "devDependencies": {
@@ -49,13 +49,13 @@
     "@types/node": "24.1.0",
     "eslint": "^8.56.0",
     "npm-run-all": "4.1.5",
-    "prettier": "^3.6.2",
-    "prettier-plugin-organize-imports": "^4.2.0",
-    "tsx": "4.20.3",
-    "typescript": "5.8.3",
-    "vite": "7.0.6",
-    "vitest": "3.2.4",
-    "zod": "4.0.8"
+    "prettier": "^3.8.3",
+    "prettier-plugin-organize-imports": "^4.3.0",
+    "tsx": "4.21.0",
+    "typescript": "6.0.3",
+    "vite": "8.0.10",
+    "vitest": "4.1.5",
+    "zod": "4.4.3"
   },
   "sideEffects": false,
   "tsup": {
@@ -79,7 +79,7 @@
     ]
   },
   "dependencies": {
-    "@sequelize/utils": "^7.0.0-alpha.46",
-    "dedent": "^1.6.0"
+    "@sequelize/utils": "^7.0.0-alpha.48",
+    "dedent": "^1.7.2"
   }
 }

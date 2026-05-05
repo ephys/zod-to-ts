@@ -11,6 +11,7 @@ import type {
   $ZodCatchDef,
   $ZodDefaultDef,
   $ZodEnumDef,
+  $ZodFunctionDef,
   $ZodIntersectionDef,
   $ZodLazyDef,
   $ZodLiteralDef,
@@ -226,10 +227,7 @@ Path: ${readablePath.join(' → ')}`,
     }
 
     case 'void': {
-      return f.createUnionTypeNode([
-        f.createKeywordTypeNode(SyntaxKind.VoidKeyword),
-        f.createKeywordTypeNode(SyntaxKind.UndefinedKeyword),
-      ]);
+      return f.createKeywordTypeNode(SyntaxKind.VoidKeyword);
     }
 
     case 'any': {
@@ -660,6 +658,104 @@ Path: ${readablePath.join(' → ')}`,
       );
 
       return f.createTypeReferenceNode(f.createIdentifier('Promise'), [type]);
+    }
+
+    case 'function': {
+      // z.function() -> (...args: unknown[]) => unknown
+      // z.function({ input: z.tuple([z.string()]), output: z.number() }) -> (arg0: string) => number
+      // z.function({ input: z.tuple([z.string()], z.number()), output: z.number() }) -> (arg0: string, ...rest: number[]) => number
+      const functionDef = def as $ZodFunctionDef;
+
+      const returnType = zodToTypeOrIdentifierNode(
+        functionDef.output,
+        options,
+        [...path, currentSchema],
+        [
+          ...readablePath,
+          getReadablePath('#output', functionDef.output, options?.registry),
+        ],
+        EMPTY_OBJECT,
+      );
+
+      const inputDef = functionDef.input._zod.def;
+      let parameters: ts.ParameterDeclaration[];
+
+      if (inputDef.type === 'tuple') {
+        const tupleDef = inputDef as $ZodTupleDef;
+
+        parameters = tupleDef.items.map((item, i) =>
+          f.createParameterDeclaration(
+            undefined,
+            undefined,
+            f.createIdentifier(`arg${i}`),
+            undefined,
+            zodToTypeOrIdentifierNode(
+              item,
+              options,
+              [...path, currentSchema],
+              [
+                ...readablePath,
+                getReadablePath(`#arg${i}`, item, options?.registry),
+              ],
+              EMPTY_OBJECT,
+            ),
+          ),
+        );
+
+        if (tupleDef.rest) {
+          parameters.push(
+            f.createParameterDeclaration(
+              undefined,
+              f.createToken(SyntaxKind.DotDotDotToken),
+              f.createIdentifier('rest'),
+              undefined,
+              f.createArrayTypeNode(
+                zodToTypeOrIdentifierNode(
+                  tupleDef.rest,
+                  options,
+                  [...path, currentSchema],
+                  [
+                    ...readablePath,
+                    getReadablePath('#rest', tupleDef.rest, options?.registry),
+                  ],
+                  EMPTY_OBJECT,
+                ),
+              ),
+            ),
+          );
+        }
+      } else {
+        // Array or unknown input — use rest parameter
+        const elementType =
+          inputDef.type === 'array'
+            ? zodToTypeOrIdentifierNode(
+                (inputDef as $ZodArrayDef).element,
+                options,
+                [...path, currentSchema],
+                [
+                  ...readablePath,
+                  getReadablePath(
+                    '#args',
+                    (inputDef as $ZodArrayDef).element,
+                    options?.registry,
+                  ),
+                ],
+                EMPTY_OBJECT,
+              )
+            : createUnknownKeywordNode();
+
+        parameters = [
+          f.createParameterDeclaration(
+            undefined,
+            f.createToken(SyntaxKind.DotDotDotToken),
+            f.createIdentifier('args'),
+            undefined,
+            f.createArrayTypeNode(elementType),
+          ),
+        ];
+      }
+
+      return f.createFunctionTypeNode(undefined, parameters, returnType);
     }
 
     case 'template_literal': {

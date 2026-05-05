@@ -10,7 +10,7 @@ describe('primitives', () => {
     [z.date(), 'Date'],
     [z.undefined(), 'undefined'],
     [z.null(), 'null'],
-    [z.void(), 'void | undefined'],
+    [z.void(), 'void'],
     [z.any(), 'any'],
     [z.unknown(), 'unknown'],
     [z.never(), 'never'],
